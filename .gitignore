@@ -1,0 +1,25 @@
+# Ignore node_modules
+client/node_modules/
+server/node_modules/
+node_modules
+# Ignore environment files
+server/.env
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# npm / yarn / pnpm
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs (optional)
+client/build/
+client/dist/
+
+# Vite/CRA cache (optional)
+client/.cache/
