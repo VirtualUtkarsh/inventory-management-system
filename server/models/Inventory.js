@@ -8,7 +8,10 @@ const inventorySchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: true
+    required: true,
+    default: function() {
+      return `Item ${this.sku}`; // Auto-generate name if not provided
+    }
   },
   quantity: {
     type: Number,
@@ -17,40 +20,33 @@ const inventorySchema = new mongoose.Schema({
   },
   bin: {
     type: String,
-    required: true
+    required: true,
+    default: 'DEFAULT'
   },
   lastUpdated: {
     type: Date,
     default: Date.now
   }
-}, { timestamps: true });
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true } 
+});
 
-/**
- * Static method to update or create inventory
- * @param {string} sku - Stock Keeping Unit
- * @param {number} change - Quantity change (+ve for insert, -ve for removal)
- * @param {string} bin - Bin location (optional)
- * @returns {Object} Updated or created inventory item
- */
-inventorySchema.statics.updateStock = async function(sku, change, bin) {
-  let item = await this.findOne({ sku }); // ✅ Use 'let' to allow reassignment
+// Static method for stock updates
+inventorySchema.statics.updateStock = async function(sku, change, bin, name) {
+  let item = await this.findOne({ sku });
 
   if (item) {
     item.quantity += change;
-
-    if (item.quantity < 0) {
-      throw new Error('Insufficient stock');
-    }
-
+    if (item.quantity < 0) throw new Error('Insufficient stock');
     if (bin) item.bin = bin;
+    if (name) item.name = name;
   } else {
-    if (change <= 0) {
-      throw new Error('Cannot remove stock for non-existent item');
-    }
-
-    item = new this({
+    if (change <= 0) throw new Error('Cannot remove non-existent item');
+    item = new this({ 
       sku,
-      name: `Item ${sku}`, // Default name
+      name: name || `Item ${sku}`,
       quantity: change,
       bin: bin || 'DEFAULT'
     });

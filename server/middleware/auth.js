@@ -14,10 +14,9 @@ const auth = async (req, res, next) => {
     req.user = user;
     req.userId = user._id;         
     req.username = user.name;      
-      req.token = token;
-console.log('Authenticated user:', req.userId, req.username); 
+    req.token = token;
 
-    console.log('Authenticated user:', req.userId, req.username);
+    console.log('Authenticated user:', req.userId, req.username); 
     next();
   } catch (error) {
     res.status(401).send({ error: 'Please authenticate' });
