@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes/api'); // Centralized route file
+const outsetRoutes = require('./routes/outset');
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +22,8 @@ app.use(morgan('dev'));
 
 // Mount all API routes (auth, insets, inventory, outsets, etc.)
 app.use('/api', apiRoutes);
+app.use('/api/outset', outsetRoutes); 
+
 
 // Global Error Handler
 app.use((err, req, res, next) => {

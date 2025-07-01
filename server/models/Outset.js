@@ -3,28 +3,32 @@ const mongoose = require('mongoose');
 const outsetSchema = new mongoose.Schema({
   sku: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
-  orderNo: {
+  name: {
     type: String,
-    required: true
-  },
-  bin: {
-    type: String,
-    required: true
+    trim: true
   },
   quantity: {
     type: Number,
     required: true,
     min: 1
   },
+  bin: {
+    type: String,
+    required: true,
+    trim: true
+  },
   customerName: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   invoiceNo: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   user: {
     id: {
@@ -38,5 +42,19 @@ const outsetSchema = new mongoose.Schema({
     }
   }
 }, { timestamps: true });
+
+// Auto-update inventory on outset creation
+outsetSchema.post('save', async function(doc) {
+  const Inventory = mongoose.model('Inventory');
+  try {
+    await Inventory.findOneAndUpdate(
+      { sku: doc.sku },
+      { $inc: { quantity: -doc.quantity } }
+    );
+  } catch (error) {
+    console.error('Failed to update inventory:', error);
+    throw error; // Prevent outset from saving if inventory update fails
+  }
+});
 
 module.exports = mongoose.model('Outset', outsetSchema);
