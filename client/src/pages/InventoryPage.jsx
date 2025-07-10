@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import Navigation from '../components/Navigation';
 import { useAuth } from '../context/AuthContext';
 import axios from '../utils/axiosInstance';
-// import axios from 'axios';
 import { toast } from 'react-toastify';
+import InventoryTable from '../components/InventoryTable';
 import 'react-toastify/dist/ReactToastify.css';
 
 const InventoryPage = () => {
@@ -17,7 +18,7 @@ const InventoryPage = () => {
       setInventory(data);
     } catch (err) {
       setError('Failed to fetch inventory');
-      toast.error('Failed to load inventory');
+      toast.error('Error loading inventory');
     } finally {
       setLoading(false);
     }
@@ -27,44 +28,57 @@ const InventoryPage = () => {
     fetchInventory();
   }, []);
 
+  const totalItems = inventory.length;
+  const lowStockCount = inventory.filter(item => item.quantity < 5).length;
+  const uniqueBins = new Set(inventory.map(item => item.bin)).size;
+
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Inventory Dashboard</h1>
-      
-      {loading ? (
-        <div className="text-center py-8">Loading inventory...</div>
-      ) : error ? (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
-          {error}
+    <div>
+      <Navigation />
+
+      <div className="container mx-auto px-4 py-4">
+        {/* Hero Section */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold mb-2 text-center">📦 VeroLie Inventory</h1>
+          <img 
+            src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/a5d620f0-d980-4974-a74f-886f2a630962.png"
+            alt="Warehouse with shelves and worker scanning"
+            className="rounded-md shadow-sm mb-2 w-full max-w-md mx-auto"
+          />
+          <p className="text-gray-700 text-center text-sm">
+            This is the Inventory page. Navigate to Outsets or Insets from the menu above.
+          </p>
         </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bin</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {inventory.map((item) => (
-                <tr key={item._id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.sku}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.bin}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(item.lastUpdated).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div className="bg-blue-100 text-blue-800 p-3 rounded-md shadow-sm">
+            <h4 className="text-xs font-semibold">Total Items</h4>
+            <p className="text-lg font-bold">{totalItems}</p>
+          </div>
+          <div className="bg-yellow-100 text-yellow-800 p-3 rounded-md shadow-sm">
+            <h4 className="text-xs font-semibold">Low Stock (&lt; 5)</h4>
+            <p className="text-lg font-bold">{lowStockCount}</p>
+          </div>
+          <div className="bg-green-100 text-green-800 p-3 rounded-md shadow-sm">
+            <h4 className="text-xs font-semibold">Unique Bins</h4>
+            <p className="text-lg font-bold">{uniqueBins}</p>
+          </div>
         </div>
-      )}
+
+        {/* Table or Error States */}
+        {loading ? (
+          <div className="text-center py-6 text-gray-600 text-sm">Loading inventory...</div>
+        ) : error ? (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-3 text-sm">
+            {error}
+          </div>
+        ) : inventory.length === 0 ? (
+          <div className="text-center text-gray-500 py-8 text-sm">No inventory records found.</div>
+        ) : (
+          <InventoryTable inventory={inventory} />
+        )}
+      </div>
     </div>
   );
 };

@@ -1,17 +1,21 @@
 const mongoose = require('mongoose');
+const Inventory = require('./Inventory'); // required to access updateStock()
 
 const insetSchema = new mongoose.Schema({
   sku: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   orderNo: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   bin: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   quantity: {
     type: Number,
@@ -30,5 +34,17 @@ const insetSchema = new mongoose.Schema({
     }
   }
 }, { timestamps: true });
+
+// ✅ Use Inventory.updateStock in post-save
+insetSchema.post('save', async function(doc, next) {
+  try {
+    await Inventory.updateStock(doc.sku, doc.quantity, doc.bin);
+    console.log('✅ Inventory increased for SKU:', doc.sku);
+    next();
+  } catch (error) {
+    console.error('❌ Failed to update inventory:', error.message);
+    next(error); // Still save inset, but log the error
+  }
+});
 
 module.exports = mongoose.model('Inset', insetSchema);
