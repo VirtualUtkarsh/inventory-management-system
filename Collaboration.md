@@ -74,4 +74,6 @@ Then your pull request code will be reviewed and then merged if approved by at l
 
 ## 🧠 Need Help?
 
-Use GPT.
+Try GPT and if things gets too complex then Tushar.
+![image](https://github.com/user-attachments/assets/ab9d3919-69de-4177-af33-40f453d9e005)
+
