@@ -30,7 +30,7 @@ git pull origin dev
 ## ✅ Simple Git Workflow (Feature-first, Push-last)
 
 ### 1. Switch to `dev` and get the latest updates
-
+DO this step ONLY if you need the latest code from dev copied to your local project
 This will just clone the latest finalised code into your system.
 ```bash
 git checkout dev
@@ -52,14 +52,15 @@ I'll review and test the code and pull request to the dev branch.
 
 ### 4. When the feature is 100% ready:
 Finally push your code!!
+These commands will push you code to new branch: feature/<your-feature-name> 
 ```bash
 git add .
 git commit -m "Complete: <feature-name> ✅"
 git push -u origin feature/<your-feature-name>
 ```
 
-Then, go to GitHub and **create a Pull Request from your feature branch to `dev`**.
-
+### 5. Then, go to GitHub and **create a Pull Request from your feature branch to `dev`**.
+Then your pull request code will be reviewed and then merged if approved by at least one of the team members
 ---
 
 ## 🚫 Don't Do This
