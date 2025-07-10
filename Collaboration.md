@@ -10,7 +10,7 @@ This document explains exactly how our team will collaborate using Git and GitHu
 * **main** → Production-ready code only
 * **dev** → Active development, integration of features
 * **feature/<your-feature-name>** → One branch per task/person
-
+# KINDLY DO NOT PUSH CODE TO DEV OR MAIN BRANCH
 ---
 
 ## 👥 For Team Members
