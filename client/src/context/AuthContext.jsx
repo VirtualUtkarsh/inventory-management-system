@@ -6,12 +6,12 @@ import { useNavigate } from 'react-router-dom';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser ] = useState(null);
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const navigate = useNavigate();
 
-  // Set the base URL for axios
-  axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/';
+  // Set the base URL for axios (no trailing slash)
+  axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   // Login function
   const login = async (email, password) => {
@@ -19,9 +19,10 @@ export const AuthProvider = ({ children }) => {
       const { data } = await axios.post('/api/auth/login', { email, password });
       localStorage.setItem('token', data.token);
       setToken(data.token);
-      setUser (data.user);
+      setUser(data.user);
       navigate('/inventory');
     } catch (error) {
+      console.error('Login error:', error);
       throw error.response?.data || error.message;
     }
   };
@@ -29,12 +30,15 @@ export const AuthProvider = ({ children }) => {
   // Register function
   const register = async (name, email, password) => {
     try {
+      console.log('AuthContext register called with:', { name, email });
       const { data } = await axios.post('/api/auth/register', { name, email, password });
+      console.log('AuthContext register successful:', data);
       localStorage.setItem('token', data.token);
       setToken(data.token);
-      setUser (data.user);
+      setUser(data.user);
       navigate('/inventory');
     } catch (error) {
+      console.error('Register error:', error);
       throw error.response?.data || error.message;
     }
   };
@@ -43,19 +47,24 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
-    setUser (null);
+    setUser(null);
     navigate('/login');
   };
 
-  // Effect to check token expiration and set user
+  // Effect to decode token and set user
   useEffect(() => {
     if (token) {
-      const decoded = jwt_decode(token);
-      if (decoded.exp * 1000 < Date.now()) {
+      try {
+        const decoded = jwt_decode(token);
+        if (decoded.exp * 1000 < Date.now()) {
+          logout(); // Token expired
+        } else {
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          setUser(decoded);
+        }
+      } catch (error) {
+        console.error('Token decode error:', error);
         logout();
-      } else {
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        setUser (decoded);
       }
     }
   }, [token]);

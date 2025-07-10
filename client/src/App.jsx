@@ -21,7 +21,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Protected Routes with Layout (includes Navigation) */}
+          {/* Protected Routes with shared Layout */}
           <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route path="/" element={<InventoryPage />} />
             <Route path="/inventory" element={<InventoryPage />} />

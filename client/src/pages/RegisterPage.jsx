@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import axios from 'axios'
 import './RegisterPage.css'
 
 export default function RegisterPage() {
@@ -11,9 +10,11 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: ''
   })
+
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
-  const { login } = useAuth()
+
+  const { register: authRegister } = useAuth()
   const navigate = useNavigate()
 
   const handleChange = (e) => {
@@ -29,9 +30,9 @@ export default function RegisterPage() {
     if (!formData.name.trim()) newErrors.name = 'Name is required'
     if (!formData.email.includes('@')) newErrors.email = 'Valid email required'
     if (formData.password.length < 6) newErrors.password = 'Minimum 6 characters'
-    if (formData.password !== formData.confirmPassword) {
+    if (formData.password !== formData.confirmPassword)
       newErrors.confirmPassword = 'Passwords must match'
-    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -42,20 +43,24 @@ export default function RegisterPage() {
 
     setIsLoading(true)
     try {
-      const { data } = await axios.post('/api/auth/register', {
+      console.log('Attempting registration with:', {
         name: formData.name,
-        email: formData.email,
-        password: formData.password
+        email: formData.email
       })
 
-      // Automatically log in after registration
-      login(data.token, data.user)
-      navigate('/dashboard')
-      
+      await authRegister(formData.name, formData.email, formData.password)
+
+      console.log('✅ Registration successful!')
+      // Navigation is already handled in authRegister()
     } catch (err) {
-      setErrors({
-        server: err.response?.data?.message || 'Registration failed'
-      })
+      console.error('❌ Registration error:', err)
+
+      let errorMessage = 'Registration failed'
+      if (typeof err === 'string') errorMessage = err
+      else if (err.message) errorMessage = err.message
+      else if (err.msg) errorMessage = err.msg
+
+      setErrors({ server: errorMessage })
     } finally {
       setIsLoading(false)
     }
@@ -65,9 +70,7 @@ export default function RegisterPage() {
     <div className="register-container">
       <div className="register-card">
         <div className="register-header">
-          <h2 className="register-title">
-            Create your account
-          </h2>
+          <h2 className="register-title">Create your account</h2>
           <p className="register-subtitle">
             Already registered?{' '}
             <Link to="/login" className="register-link">
@@ -76,23 +79,16 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {errors.server && (
-          <div className="error-banner">
-            {errors.server}
-          </div>
-        )}
+        {errors.server && <div className="error-banner">{errors.server}</div>}
 
         <form className="register-form" onSubmit={handleSubmit}>
           <div className="form-fields">
             <div className="form-field">
-              <label htmlFor="name" className="form-label">
-                Full Name
-              </label>
+              <label htmlFor="name" className="form-label">Full Name</label>
               <input
                 id="name"
                 name="name"
                 type="text"
-                required
                 value={formData.name}
                 onChange={handleChange}
                 className={`form-input ${errors.name ? 'form-input-error' : ''}`}
@@ -101,15 +97,12 @@ export default function RegisterPage() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="email" className="form-label">
-                Email address
-              </label>
+              <label htmlFor="email" className="form-label">Email address</label>
               <input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
-                required
                 value={formData.email}
                 onChange={handleChange}
                 className={`form-input ${errors.email ? 'form-input-error' : ''}`}
@@ -118,14 +111,11 @@ export default function RegisterPage() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="password" className="form-label">
-                Password
-              </label>
+              <label htmlFor="password" className="form-label">Password</label>
               <input
                 id="password"
                 name="password"
                 type="password"
-                required
                 value={formData.password}
                 onChange={handleChange}
                 className={`form-input ${errors.password ? 'form-input-error' : ''}`}
@@ -134,21 +124,16 @@ export default function RegisterPage() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="confirmPassword" className="form-label">
-                Confirm Password
-              </label>
+              <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
               <input
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
-                required
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 className={`form-input ${errors.confirmPassword ? 'form-input-error' : ''}`}
               />
-              {errors.confirmPassword && (
-                <p className="field-error">{errors.confirmPassword}</p>
-              )}
+              {errors.confirmPassword && <p className="field-error">{errors.confirmPassword}</p>}
             </div>
           </div>
 
