@@ -40,16 +40,16 @@ const insetSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// 📦 Automatically update inventory after inset is saved
-insetSchema.post('save', async function (doc, next) {
-  try {
-    await Inventory.updateStock(doc.sku, doc.quantity, doc.bin);
-    console.log('✅ Inventory increased for SKU:', doc.sku);
-    next();
-  } catch (error) {
-    console.error('❌ Failed to update inventory:', error.message);
-    next(error);
-  }
-});
+// // 📦 Automatically update inventory after inset is saved
+// insetSchema.post('save', async function (doc, next) {
+//   try {
+//     await Inventory.updateStock(doc.sku, doc.quantity, doc.bin);
+//     console.log('✅ Inventory increased for SKU:', doc.sku);
+//     next();
+//   } catch (error) {
+//     console.error('❌ Failed to update inventory:', error.message);
+//     next(error);
+//   }
+// });
 
 module.exports = mongoose.model('Inset', insetSchema);
