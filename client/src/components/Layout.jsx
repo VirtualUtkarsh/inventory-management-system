@@ -4,6 +4,8 @@ import './Layout.css';
 
 const Layout = () => {
   const { user, logout } = useAuth();
+  console.log("User context:", user);
+
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -17,7 +19,9 @@ const Layout = () => {
         <div className="container flex justify-between items-center py-4">
           <h1 className="text-2xl font-bold">Vero Lie Inventory</h1>
           <div className="user-info flex items-center gap-4">
-            <span className="text-gray-700">Welcome, {user?.name || 'User'}</span>
+            <span className="text-gray-700">
+              Welcome, {user?.name || 'User'} ({user?.role === 'admin' ? 'admin' : 'General'})
+            </span>
             <button onClick={handleLogout} className="btn-secondary">
               Logout
             </button>
@@ -37,6 +41,12 @@ const Layout = () => {
             <li>
               <Link to="/outsets">Outbound Items</Link>
             </li>
+            {/* Add Admin Dashboard link for admin users */}
+            {user?.role === 'admin' && (
+              <li>
+                <Link to="/admin">Admin Dashboard</Link>
+              </li>
+            )}
           </ul>
         </div>
       </nav>

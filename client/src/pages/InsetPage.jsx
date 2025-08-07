@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Navigation from '../components/Navigation';
 import axios from 'axios';
 
 const InsetPage = () => {
@@ -70,7 +69,6 @@ const InsetPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
       <div className="container mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-6">

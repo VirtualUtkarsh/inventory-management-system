@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Navigation = () => {
   const location = useLocation();
+  const { user } = useAuth();
 
-  // Highlight the active route
   const isActive = (path) =>
     location.pathname === path
       ? 'bg-blue-600 text-white'
@@ -32,6 +33,14 @@ const Navigation = () => {
           >
             Inset
           </Link>
+          {user?.role === 'admin' && (
+            <Link
+              to="/admin"
+              className={`px-4 py-2 rounded-md transition-colors duration-200 ${isActive('/admin')}`}
+            >
+              Admin Dashboard
+            </Link>
+          )}
         </div>
       </div>
     </nav>

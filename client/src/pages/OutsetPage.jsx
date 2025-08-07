@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Navigation from '../components/Navigation';
+// Remove Navigation import
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -16,6 +16,7 @@ export default function OutsetPage() {
   const [showOutsetModal, setShowOutsetModal] = useState(false);
   const [outsetItems, setOutsetItems] = useState([]);
   const [loading, setLoading] = useState({ inventory: true, outsets: true });
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,6 +41,7 @@ export default function OutsetPage() {
     setQuantity(1);
     setCustomerName('');
     setInvoiceNo('');
+    setSearchTerm(''); // Clear search when selecting a product
     setShowProductModal(false);
     setShowOutsetModal(true);
   };
@@ -73,13 +75,14 @@ export default function OutsetPage() {
     } finally {
       setSelectedProduct(null);
       setShowOutsetModal(false);
+      setSearchTerm(''); // Clear search after successful outset
       setLoading(prev => ({ ...prev, outsets: false }));
     }
   };
 
   return (
     <div>
-      <Navigation />
+      {/* Remove Navigation component */}
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -161,27 +164,72 @@ export default function OutsetPage() {
 
         {/* Product Modal */}
         {showProductModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-lg font-semibold mb-4">Select Product</h2>
-              {inventory.map(product => (
-                <div
-                  key={product._id}
-                  onClick={() => handleProductSelect(product)}
-                  className="border p-3 rounded-lg mb-2 cursor-pointer hover:bg-blue-50"
-                >
-                  <div className="font-medium">{product.name || `Item ${product.sku}`}</div>
-                  <div className="text-sm text-gray-600">
-                    SKU: {product.sku} | Qty: {product.quantity} | Bin: {product.bin}
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-md max-h-[80vh] flex flex-col">
+              <div className="p-6 border-b">
+                <h2 className="text-lg font-semibold mb-4">Select Product</h2>
+                {/* Search Input */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search products by SKU, name, or bin..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
                   </div>
                 </div>
-              ))}
-              <button
-                onClick={() => setShowProductModal(false)}
-                className="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-              >
-                Cancel
-              </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                {(() => {
+                  // Filter inventory based on search term
+                  const filteredInventory = inventory.filter(product => {
+                    if (!searchTerm.trim()) return true;
+                    const search = searchTerm.toLowerCase();
+                    return (
+                      product.sku.toLowerCase().includes(search) ||
+                      (product.name && product.name.toLowerCase().includes(search)) ||
+                      product.bin.toLowerCase().includes(search)
+                    );
+                  });
+
+                  if (filteredInventory.length === 0) {
+                    return (
+                      <div className="text-center text-gray-500 py-8">
+                        {searchTerm.trim() ? 'No products found matching your search.' : 'No products available.'}
+                      </div>
+                    );
+                  }
+
+                  return filteredInventory.map(product => (
+                    <div
+                      key={product._id}
+                      onClick={() => handleProductSelect(product)}
+                      className="border p-3 rounded-lg mb-2 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
+                    >
+                      <div className="font-medium">{product.name || `Item ${product.sku}`}</div>
+                      <div className="text-sm text-gray-600">
+                        SKU: {product.sku} | Qty: {product.quantity} | Bin: {product.bin}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+              <div className="p-6 border-t">
+                <button
+                  onClick={() => {
+                    setShowProductModal(false);
+                    setSearchTerm(''); // Clear search when closing modal
+                  }}
+                  className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}

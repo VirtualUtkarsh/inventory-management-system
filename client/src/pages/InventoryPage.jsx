@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Navigation from '../components/Navigation';
+// Remove Navigation import
 import { useAuth } from '../context/AuthContext';
 import axios from '../utils/axiosInstance';
 import { toast } from 'react-toastify';
@@ -34,7 +34,7 @@ const InventoryPage = () => {
 
   return (
     <div>
-      <Navigation />
+      {/* Remove Navigation component */}
 
       <div className="container mx-auto px-4 py-4">
         {/* Hero Section */}

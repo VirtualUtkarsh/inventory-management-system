@@ -8,12 +8,11 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
+  const [loading, setLoading] = useState(true); // 👈 added loading
   const navigate = useNavigate();
 
-  // Set the base URL for axios (no trailing slash)
   axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-  // Login function
   const login = async (email, password) => {
     try {
       const { data } = await axios.post('/api/auth/login', { email, password });
@@ -27,12 +26,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register function
   const register = async (name, email, password) => {
     try {
-      console.log('AuthContext register called with:', { name, email });
       const { data } = await axios.post('/api/auth/register', { name, email, password });
-      console.log('AuthContext register successful:', data);
       localStorage.setItem('token', data.token);
       setToken(data.token);
       setUser(data.user);
@@ -43,7 +39,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout function
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
@@ -51,26 +46,38 @@ export const AuthProvider = ({ children }) => {
     navigate('/login');
   };
 
-  // Effect to decode token and set user
   useEffect(() => {
-    if (token) {
+    const initializeAuth = async () => {
+      if (!token) {
+        setLoading(false); // 👈 release if no token
+        return;
+      }
+
       try {
         const decoded = jwt_decode(token);
         if (decoded.exp * 1000 < Date.now()) {
-          logout(); // Token expired
+          logout();
         } else {
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          setUser(decoded);
+
+          if (!user) {
+            const res = await axios.get('/api/auth/me');
+            setUser(res.data.user);
+          }
         }
       } catch (error) {
-        console.error('Token decode error:', error);
+        console.error('Token decode or /me fetch error:', error);
         logout();
+      } finally {
+        setLoading(false); // 👈 release after done
       }
-    }
+    };
+
+    initializeAuth();
   }, [token]);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

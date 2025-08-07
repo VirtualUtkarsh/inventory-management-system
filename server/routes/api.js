@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { check } = require('express-validator');
-const auth = require('../middleware/auth');
+const {auth} = require('../middleware/auth');
 const authRoutes = require('./auth'); // Import your auth routes
 const inventoryController = require('../controllers/inventoryController');
 const insetController = require('../controllers/insetController');
 const outsetController = require('../controllers/outsetController');
+const adminRoutes = require('./admin');
 
 // Auth routes - this will handle /api/auth/register and /api/auth/login
 router.use('/auth', authRoutes);
@@ -19,5 +20,8 @@ router.get('/insets', auth, insetController.getInsets);
 
 router.post('/outsets', auth, outsetController.createOutset);
 router.get('/outsets', auth, outsetController.getOutsets);
+
+router.use('/admin', adminRoutes);
+
 
 module.exports = router;

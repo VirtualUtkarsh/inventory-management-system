@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Outset = require('../models/Outset');
 const Inventory = require('../models/Inventory');
-const auth = require('../middleware/auth');
+const {auth} = require('../middleware/auth');
 
 // @route   POST /api/outset
 // @desc    Create outbound record

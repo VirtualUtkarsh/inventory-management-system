@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Inventory = require('../models/Inventory');
 const AuditLog = require('../models/AuditLog');
-const auth = require('../middleware/auth');
+const {auth} = require('../middleware/auth');
 
 // @route   GET /api/inventory
 // @desc    Get all inventory items
