@@ -8,7 +8,7 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [loading, setLoading] = useState(true); // 👈 added loading
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -19,7 +19,15 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', data.token);
       setToken(data.token);
       setUser(data.user);
-      navigate('/inventory');
+      
+      // Navigate based on user role
+      if (data.user?.role === 'admin') {
+        console.log('🔍 Navigating admin to /admin');
+        navigate('/admin');
+      } else {
+        console.log('🔍 Navigating regular user to /inventory');
+        navigate('/inventory');
+      }
     } catch (error) {
       console.error('Login error:', error);
       throw error.response?.data || error.message;
@@ -32,7 +40,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', data.token);
       setToken(data.token);
       setUser(data.user);
-      navigate('/inventory');
+      
+      // Navigate based on user role
+      if (data.user?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/inventory');
+      }
     } catch (error) {
       console.error('Register error:', error);
       throw error.response?.data || error.message;
@@ -49,7 +63,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       if (!token) {
-        setLoading(false); // 👈 release if no token
+        setLoading(false);
         return;
       }
 
@@ -60,24 +74,45 @@ export const AuthProvider = ({ children }) => {
         } else {
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
+          // Always try to fetch user data if we don't have it
           if (!user) {
-            const res = await axios.get('/api/auth/me');
-            setUser(res.data.user);
+            console.log('🔍 Fetching user from /api/auth/me');
+            try {
+              const res = await axios.get('/api/auth/me');
+              console.log('🔍 /api/auth/me response:', res.data);
+              setUser(res.data.user);
+            } catch (error) {
+              console.error('🔍 /api/auth/me failed:', error);
+              // If /me route fails, try to decode user from token
+              // This is a fallback, but won't have role info
+              console.log('🔍 Falling back to token-only auth');
+            }
           }
         }
       } catch (error) {
         console.error('Token decode or /me fetch error:', error);
         logout();
       } finally {
-        setLoading(false); // 👈 release after done
+        console.log('🔍 Setting loading to false');
+        setLoading(false);
       }
     };
 
     initializeAuth();
-  }, [token]);
+  }, [token, user]); // Added user to dependency array
+
+  // DEBUG: Log current state
+  console.log('🔍 AuthContext state:', { user: user?.role, token: !!token, loading });
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      loading,
+      login,
+      register,
+      logout
+    }}>
       {children}
     </AuthContext.Provider>
   );

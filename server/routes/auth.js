@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { auth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { check, validationResult } = require('express-validator');
@@ -53,7 +54,6 @@ router.post('/register', [
   }
 });
 
-
 // @route   POST /api/auth/login
 // @desc    Login user
 router.post('/login', [
@@ -80,20 +80,24 @@ router.post('/login', [
       return res.status(400).json({ message: 'Invalid credentials' });
     }
     if (user.status !== 'approved') {
-   return res.status(403).json({ message: 'Your account is not yet approved.' });
-  }
+      return res.status(403).json({ message: 'Your account is not yet approved.' });
+    }
 
     // Create JWT
     const payload = { id: user.id };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
+    const responseUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status
+    };;
+
     res.json({
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
+      user: responseUser
     });
 
   } catch (err) {
@@ -101,9 +105,6 @@ router.post('/login', [
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-module.exports = router;
-const { auth } = require('../middleware/auth');
 
 // @route   GET /api/auth/me
 // @desc    Get current user info
@@ -120,7 +121,9 @@ router.get('/me', auth, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err.message);
+    console.error('Error in /me route:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+module.exports = router;
