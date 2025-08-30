@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-// Remove Navigation import
 import { useAuth } from '../context/AuthContext';
 import axios from '../utils/axiosInstance';
 import { toast } from 'react-toastify';
@@ -7,18 +6,62 @@ import InventoryTable from '../components/InventoryTable';
 import 'react-toastify/dist/ReactToastify.css';
 
 const InventoryPage = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [inventory, setInventory] = useState([]);
+  const [filteredInventory, setFilteredInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    search: '',
+    baseSku: '',
+    size: '',
+    color: '',
+    pack: '',
+    category: '',
+    lowStock: false,
+    outOfStock: false
+  });
+
+  // Metadata for filters
+  const [metadata, setMetadata] = useState({
+    sizes: [],
+    colors: [],
+    packs: [],
+    categories: [],
+    baseSKUs: []
+  });
 
   const fetchInventory = async () => {
     try {
-      const { data } = await axios.get('/api/inventory');
+      setLoading(true);
+      const { data } = await axios.get('/api/inventory', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setInventory(data);
+      setFilteredInventory(data);
+      
+      // Extract unique values for filters
+      const uniqueBaseSKUs = [...new Set(data.map(item => item.baseSku).filter(Boolean))];
+      const uniqueSizes = [...new Set(data.map(item => item.size).filter(Boolean))];
+      const uniqueColors = [...new Set(data.map(item => item.color).filter(Boolean))];
+      const uniquePacks = [...new Set(data.map(item => item.pack).filter(Boolean))];
+      const uniqueCategories = [...new Set(data.map(item => item.category).filter(Boolean))];
+      
+      setMetadata(prev => ({
+        ...prev,
+        baseSKUs: uniqueBaseSKUs.sort(),
+        sizes: uniqueSizes.sort(),
+        colors: uniqueColors.sort(),
+        packs: uniquePacks.sort(),
+        categories: uniqueCategories.sort()
+      }));
+      
     } catch (err) {
       setError('Failed to fetch inventory');
       toast.error('Error loading inventory');
+      console.error('Inventory fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -26,57 +69,257 @@ const InventoryPage = () => {
 
   useEffect(() => {
     fetchInventory();
-  }, []);
+  }, [token]);
 
+  // Apply filters whenever filters or inventory changes
+  useEffect(() => {
+    let filtered = [...inventory];
+
+    // Search filter (searches SKU ID and name)
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(item => 
+        (item.skuId || '').toLowerCase().includes(searchTerm) ||
+        (item.name || '').toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Base SKU filter
+    if (filters.baseSku) {
+      filtered = filtered.filter(item => item.baseSku === filters.baseSku);
+    }
+
+    // Size filter
+    if (filters.size) {
+      filtered = filtered.filter(item => item.size === filters.size);
+    }
+
+    // Color filter
+    if (filters.color) {
+      filtered = filtered.filter(item => 
+        item.color && item.color.includes(filters.color)
+      );
+    }
+
+    // Pack filter
+    if (filters.pack) {
+      filtered = filtered.filter(item => item.pack === filters.pack);
+    }
+
+    // Category filter
+    if (filters.category) {
+      filtered = filtered.filter(item => item.category === filters.category);
+    }
+
+    // Low stock filter (less than 10)
+    if (filters.lowStock) {
+      filtered = filtered.filter(item => item.quantity > 0 && item.quantity < 10);
+    }
+
+    // Out of stock filter
+    if (filters.outOfStock) {
+      filtered = filtered.filter(item => item.quantity === 0);
+    }
+
+    setFilteredInventory(filtered);
+  }, [filters, inventory]);
+
+  const handleFilterChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      baseSku: '',
+      size: '',
+      color: '',
+      pack: '',
+      category: '',
+      lowStock: false,
+      outOfStock: false
+    });
+  };
+
+  // Calculate metrics
   const totalItems = inventory.length;
-  const lowStockCount = inventory.filter(item => item.quantity < 5).length;
-  const uniqueBins = new Set(inventory.map(item => item.bin)).size;
+  const totalQuantity = inventory.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const lowStockCount = inventory.filter(item => item.quantity > 0 && item.quantity < 10).length;
+  const outOfStockCount = inventory.filter(item => item.quantity === 0).length;
+  const uniqueBins = new Set(inventory.map(item => item.bin).filter(Boolean)).size;
+  const uniqueBaseSKUs = new Set(inventory.map(item => item.baseSku).filter(Boolean)).size;
 
   return (
-    <div>
-      {/* Remove Navigation component */}
-
-      <div className="container mx-auto px-4 py-4">
-        {/* Hero Section */}
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold mb-2 text-center">📦 VeroLie Inventory</h1>
-          <img 
-            src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/a5d620f0-d980-4974-a74f-886f2a630962.png"
-            alt="Warehouse with shelves and worker scanning"
-            className="rounded-md shadow-sm mb-2 w-full max-w-md mx-auto"
-          />
-          <p className="text-gray-700 text-center text-sm">
-            This is the Inventory page. Navigate to Outsets or Insets from the menu above.
-          </p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Inventory Management</h1>
+          <p className="text-gray-600">Monitor and track your inventory across all variants</p>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-          <div className="bg-blue-100 text-blue-800 p-3 rounded-md shadow-sm">
-            <h4 className="text-xs font-semibold">Total Items</h4>
-            <p className="text-lg font-bold">{totalItems}</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          <div className="bg-blue-100 text-blue-800 p-4 rounded-lg shadow-sm">
+            <h4 className="text-xs font-semibold uppercase tracking-wide">Total SKUs</h4>
+            <p className="text-2xl font-bold">{totalItems}</p>
           </div>
-          <div className="bg-yellow-100 text-yellow-800 p-3 rounded-md shadow-sm">
-            <h4 className="text-xs font-semibold">Low Stock (&lt; 5)</h4>
-            <p className="text-lg font-bold">{lowStockCount}</p>
+          
+          <div className="bg-green-100 text-green-800 p-4 rounded-lg shadow-sm">
+            <h4 className="text-xs font-semibold uppercase tracking-wide">Total Qty</h4>
+            <p className="text-2xl font-bold">{totalQuantity}</p>
           </div>
-          <div className="bg-green-100 text-green-800 p-3 rounded-md shadow-sm">
-            <h4 className="text-xs font-semibold">Unique Bins</h4>
-            <p className="text-lg font-bold">{uniqueBins}</p>
+          
+          <div className="bg-yellow-100 text-yellow-800 p-4 rounded-lg shadow-sm">
+            <h4 className="text-xs font-semibold uppercase tracking-wide">Low Stock</h4>
+            <p className="text-2xl font-bold">{lowStockCount}</p>
           </div>
+          
+          <div className="bg-red-100 text-red-800 p-4 rounded-lg shadow-sm">
+            <h4 className="text-xs font-semibold uppercase tracking-wide">Out of Stock</h4>
+            <p className="text-2xl font-bold">{outOfStockCount}</p>
+          </div>
+          
+          <div className="bg-purple-100 text-purple-800 p-4 rounded-lg shadow-sm">
+            <h4 className="text-xs font-semibold uppercase tracking-wide">Base SKUs</h4>
+            <p className="text-2xl font-bold">{uniqueBaseSKUs}</p>
+          </div>
+          
+          <div className="bg-indigo-100 text-indigo-800 p-4 rounded-lg shadow-sm">
+            <h4 className="text-xs font-semibold uppercase tracking-wide">Bins Used</h4>
+            <p className="text-2xl font-bold">{uniqueBins}</p>
+          </div>
+        </div>
+
+        {/* Filters Section */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
+            <button
+              onClick={clearFilters}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              Clear All Filters
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            {/* Search */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search SKU/Name</label>
+              <input
+                type="text"
+                name="search"
+                value={filters.search}
+                onChange={handleFilterChange}
+                placeholder="Search..."
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Base SKU Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Base SKU</label>
+              <select
+                name="baseSku"
+                value={filters.baseSku}
+                onChange={handleFilterChange}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Base SKUs</option>
+                {metadata.baseSKUs.map(sku => (
+                  <option key={sku} value={sku}>{sku}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Size Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
+              <select
+                name="size"
+                value={filters.size}
+                onChange={handleFilterChange}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Sizes</option>
+                {metadata.sizes.map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Category Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select
+                name="category"
+                value={filters.category}
+                onChange={handleFilterChange}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Categories</option>
+                {metadata.categories.map(category => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Filters */}
+          <div className="flex flex-wrap gap-3">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                name="lowStock"
+                checked={filters.lowStock}
+                onChange={handleFilterChange}
+                className="mr-2"
+              />
+              <span className="text-sm text-gray-700">Low Stock (&lt; 10)</span>
+            </label>
+            
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                name="outOfStock"
+                checked={filters.outOfStock}
+                onChange={handleFilterChange}
+                className="mr-2"
+              />
+              <span className="text-sm text-gray-700">Out of Stock</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Results Summary */}
+        <div className="mb-4">
+          <p className="text-sm text-gray-600">
+            Showing {filteredInventory.length} of {totalItems} inventory items
+          </p>
         </div>
 
         {/* Table or Error States */}
         {loading ? (
-          <div className="text-center py-6 text-gray-600 text-sm">Loading inventory...</div>
+          <div className="text-center py-8 text-gray-600">Loading inventory...</div>
         ) : error ? (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-3 text-sm">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded mb-4">
             {error}
           </div>
         ) : inventory.length === 0 ? (
-          <div className="text-center text-gray-500 py-8 text-sm">No inventory records found.</div>
+          <div className="text-center text-gray-500 py-12">
+            <p className="text-lg mb-2">No inventory records found</p>
+            <p className="text-sm">Add some inbound items to populate your inventory</p>
+          </div>
         ) : (
-          <InventoryTable inventory={inventory} />
+          <InventoryTable 
+            inventory={filteredInventory} 
+            onRefresh={fetchInventory}
+          />
         )}
       </div>
     </div>

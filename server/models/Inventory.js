@@ -1,28 +1,70 @@
+// server/models/Inventory.js
 const mongoose = require('mongoose');
 
 const inventorySchema = new mongoose.Schema({
-  sku: {
+  // Auto-generated SKU_ID (from inset/outset)
+  skuId: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    trim: true
   },
+  
+  // Individual components for filtering
+  baseSku: {
+    type: String,
+    required: true,
+    trim: true,
+    uppercase: true
+  },
+  
+  size: {
+    type: String,
+    required: true,
+    trim: true,
+    uppercase: true
+  },
+  
+  color: {
+    type: String,
+    required: true,
+    trim: true,
+    uppercase: true
+  },
+  
+  pack: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  
+  category: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  
+  // Original fields
   name: {
     type: String,
     required: true,
     default: function() {
-      return `Item ${this.sku}`; // Auto-generate name if not provided
+      return `Item ${this.skuId}`;
     }
   },
+  
   quantity: {
     type: Number,
     required: true,
     min: 0
   },
+  
   bin: {
     type: String,
     required: true,
     default: 'DEFAULT'
   },
+  
   lastUpdated: {
     type: Date,
     default: Date.now
@@ -34,8 +76,8 @@ const inventorySchema = new mongoose.Schema({
 });
 
 // Static method for stock updates
-inventorySchema.statics.updateStock = async function(sku, change, bin, name) {
-  let item = await this.findOne({ sku });
+inventorySchema.statics.updateStock = async function(skuId, change, bin, name, baseSku, size, color, pack, category) {
+  let item = await this.findOne({ skuId });
 
   if (item) {
     item.quantity += change;
@@ -45,8 +87,13 @@ inventorySchema.statics.updateStock = async function(sku, change, bin, name) {
   } else {
     if (change <= 0) throw new Error('Cannot remove non-existent item');
     item = new this({ 
-      sku,
-      name: name || `Item ${sku}`,
+      skuId,
+      baseSku,
+      size,
+      color,
+      pack,
+      category,
+      name: name || `Item ${skuId}`,
       quantity: change,
       bin: bin || 'DEFAULT'
     });

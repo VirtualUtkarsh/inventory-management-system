@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const outsetSchema = new mongoose.Schema({
-  sku: {
+  skuId: {
     type: String,
     required: true,
     trim: true
@@ -30,6 +30,30 @@ const outsetSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  // Product metadata for better tracking and filtering
+  baseSku: {
+    type: String,
+    trim: true,
+    uppercase: true
+  },
+  size: {
+    type: String,
+    trim: true,
+    uppercase: true
+  },
+  color: {
+    type: String,
+    trim: true,
+    uppercase: true
+  },
+  pack: {
+    type: String,
+    trim: true
+  },
+  category: {
+    type: String,
+    trim: true
+  },
   user: {
     id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -41,20 +65,28 @@ const outsetSchema = new mongoose.Schema({
       required: true
     }
   }
-}, { timestamps: true });
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-// Auto-update inventory on outset creation
-outsetSchema.post('save', async function(doc) {
-  const Inventory = mongoose.model('Inventory');
-  try {
-    await Inventory.findOneAndUpdate(
-      { sku: doc.sku },
-      { $inc: { quantity: -doc.quantity } }
-    );
-  } catch (error) {
-    console.error('Failed to update inventory:', error);
-    throw error; // Prevent outset from saving if inventory update fails
-  }
+// Index for efficient queries
+outsetSchema.index({ skuId: 1 });
+outsetSchema.index({ customerName: 1 });
+outsetSchema.index({ invoiceNo: 1 });
+outsetSchema.index({ createdAt: -1 });
+outsetSchema.index({ baseSku: 1 });
+
+// Virtual for formatted creation date
+outsetSchema.virtual('formattedDate').get(function() {
+  return this.createdAt.toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 });
 
 module.exports = mongoose.model('Outset', outsetSchema);

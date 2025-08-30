@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-// Remove Navigation import
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import axiosInstance from '../utils/axiosInstance';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function OutsetPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -22,8 +21,12 @@ export default function OutsetPage() {
     const fetchData = async () => {
       try {
         const [inventoryRes, outsetsRes] = await Promise.all([
-          axios.get('/api/inventory'),
-          axios.get('/api/outset')
+          axiosInstance.get('/api/inventory', {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axiosInstance.get('/api/outset', {
+            headers: { Authorization: `Bearer ${token}` }
+          })
         ]);
         setInventory(inventoryRes.data.filter(item => item.quantity > 0));
         setOutsetItems(outsetsRes.data);
@@ -34,14 +37,14 @@ export default function OutsetPage() {
       }
     };
     fetchData();
-  }, []);
+  }, [token]);
 
   const handleProductSelect = (product) => {
     setSelectedProduct(product);
     setQuantity(1);
     setCustomerName('');
     setInvoiceNo('');
-    setSearchTerm(''); // Clear search when selecting a product
+    setSearchTerm('');
     setShowProductModal(false);
     setShowOutsetModal(true);
   };
@@ -55,18 +58,25 @@ export default function OutsetPage() {
     try {
       setLoading(prev => ({ ...prev, outsets: true }));
 
-      const { data } = await axios.post('/api/outset', {
-        sku: selectedProduct.sku,
+// In handleConfirmOutset, change:
+      const { data } = await axiosInstance.post('/api/outset', {
+        skuId: selectedProduct.skuId, // Changed from 'sku' to 'skuId'
         quantity: parseInt(quantity),
         customerName,
         invoiceNo,
-        userId: user.id,
-        userName: user.name,
+        user: { // Add user object structure
+          id: user.id,
+          name: user.name
+        },
         bin: selectedProduct.bin
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       setOutsetItems(prev => [data, ...prev]);
-      const { data: updatedInventory } = await axios.get('/api/inventory');
+      const { data: updatedInventory } = await axiosInstance.get('/api/inventory', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setInventory(updatedInventory.filter(item => item.quantity > 0));
 
       toast.success('Outbound item recorded!');
@@ -75,18 +85,26 @@ export default function OutsetPage() {
     } finally {
       setSelectedProduct(null);
       setShowOutsetModal(false);
-      setSearchTerm(''); // Clear search after successful outset
+      setSearchTerm('');
       setLoading(prev => ({ ...prev, outsets: false }));
     }
   };
 
+  const getDisplaySku = (item) => {
+    return item.skuId || item.sku || 'N/A';
+  };
+
+  const getDisplayName = (item) => {
+    if (item.name) return item.name;
+    return `Item ${getDisplaySku(item)}`;
+  };
+
   return (
     <div>
-      {/* Remove Navigation component */}
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">📤 Outbound Management</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Outbound Management</h1>
           <button
             onClick={() => setShowProductModal(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
@@ -100,14 +118,27 @@ export default function OutsetPage() {
           <h2 className="text-lg font-semibold mb-3 text-gray-700">Available Inventory</h2>
           {loading.inventory ? (
             <div className="text-center">Loading inventory...</div>
+          ) : inventory.length === 0 ? (
+            <div className="text-center text-gray-500 py-4">No inventory available</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {inventory.slice(0, 3).map(item => (
                 <div key={item._id} className="p-3 border rounded shadow-sm">
-                  <div className="font-semibold">{item.name || `Item ${item.sku}`}</div>
+                  <div className="font-semibold">{getDisplayName(item)}</div>
                   <div className="text-sm text-gray-600">
-                    SKU: {item.sku} | Qty: {item.quantity} | Bin: {item.bin}
+                    SKU: <span className="font-mono">{getDisplaySku(item)}</span>
                   </div>
+                  <div className="text-sm text-gray-600">
+                    Qty: {item.quantity} | Bin: {item.bin}
+                  </div>
+                  {/* Show metadata if available */}
+                  {(item.size || item.color || item.pack) && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {item.size && <span className="bg-blue-100 text-blue-800 px-1 rounded mr-1">{item.size}</span>}
+                      {item.color && <span className="bg-green-100 text-green-800 px-1 rounded mr-1">{item.color}</span>}
+                      {item.pack && <span className="bg-purple-100 text-purple-800 px-1 rounded mr-1">{item.pack}</span>}
+                    </div>
+                  )}
                 </div>
               ))}
               {inventory.length > 3 && (
@@ -135,6 +166,7 @@ export default function OutsetPage() {
                     <th className="px-4 py-2">Time</th>
                     <th className="px-4 py-2">SKU</th>
                     <th className="px-4 py-2">Name</th>
+                    <th className="px-4 py-2">Details</th>
                     <th className="px-4 py-2">Bin</th>
                     <th className="px-4 py-2">Qty</th>
                     <th className="px-4 py-2">Customer</th>
@@ -147,8 +179,23 @@ export default function OutsetPage() {
                     <tr key={item._id} className="hover:bg-gray-50">
                       <td className="px-4 py-2">{new Date(item.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2">{new Date(item.createdAt).toLocaleTimeString()}</td>
-                      <td className="px-4 py-2 font-mono">{item.sku}</td>
-                      <td className="px-4 py-2">{item.name || `Item ${item.sku}`}</td>
+                      <td className="px-4 py-2 font-mono text-blue-800 font-semibold">
+                        {getDisplaySku(item)}
+                      </td>
+                      <td className="px-4 py-2">{getDisplayName(item)}</td>
+                      <td className="px-4 py-2">
+                        {/* Show metadata if available */}
+                        {(item.size || item.color || item.pack || item.category) ? (
+                          <div className="flex flex-wrap gap-1">
+                            {item.size && <span className="bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-xs">{item.size}</span>}
+                            {item.color && <span className="bg-green-100 text-green-800 px-1 py-0.5 rounded text-xs">{item.color}</span>}
+                            {item.pack && <span className="bg-purple-100 text-purple-800 px-1 py-0.5 rounded text-xs">{item.pack}</span>}
+                            {item.category && <span className="bg-orange-100 text-orange-800 px-1 py-0.5 rounded text-xs">{item.category}</span>}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-2">{item.bin}</td>
                       <td className="px-4 py-2 text-red-600">-{item.quantity}</td>
                       <td className="px-4 py-2">{item.customerName}</td>
@@ -190,10 +237,18 @@ export default function OutsetPage() {
                   const filteredInventory = inventory.filter(product => {
                     if (!searchTerm.trim()) return true;
                     const search = searchTerm.toLowerCase();
+                    const sku = getDisplaySku(product).toLowerCase();
+                    const name = getDisplayName(product).toLowerCase();
+                    const bin = product.bin.toLowerCase();
+                    
                     return (
-                      product.sku.toLowerCase().includes(search) ||
-                      (product.name && product.name.toLowerCase().includes(search)) ||
-                      product.bin.toLowerCase().includes(search)
+                      sku.includes(search) ||
+                      name.includes(search) ||
+                      bin.includes(search) ||
+                      (product.size && product.size.toLowerCase().includes(search)) ||
+                      (product.color && product.color.toLowerCase().includes(search)) ||
+                      (product.pack && product.pack.toLowerCase().includes(search)) ||
+                      (product.category && product.category.toLowerCase().includes(search))
                     );
                   });
 
@@ -211,10 +266,22 @@ export default function OutsetPage() {
                       onClick={() => handleProductSelect(product)}
                       className="border p-3 rounded-lg mb-2 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
                     >
-                      <div className="font-medium">{product.name || `Item ${product.sku}`}</div>
-                      <div className="text-sm text-gray-600">
-                        SKU: {product.sku} | Qty: {product.quantity} | Bin: {product.bin}
+                      <div className="font-medium">{getDisplayName(product)}</div>
+                      <div className="text-sm text-gray-600 mb-1">
+                        SKU: <span className="font-mono">{getDisplaySku(product)}</span>
                       </div>
+                      <div className="text-sm text-gray-600 mb-2">
+                        Qty: {product.quantity} | Bin: {product.bin}
+                      </div>
+                      {/* Show metadata if available */}
+                      {(product.size || product.color || product.pack || product.category) && (
+                        <div className="flex flex-wrap gap-1">
+                          {product.size && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">{product.size}</span>}
+                          {product.color && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs">{product.color}</span>}
+                          {product.pack && <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs">{product.pack}</span>}
+                          {product.category && <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs">{product.category}</span>}
+                        </div>
+                      )}
                     </div>
                   ));
                 })()}
@@ -223,7 +290,7 @@ export default function OutsetPage() {
                 <button
                   onClick={() => {
                     setShowProductModal(false);
-                    setSearchTerm(''); // Clear search when closing modal
+                    setSearchTerm('');
                   }}
                   className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
                 >
@@ -240,10 +307,22 @@ export default function OutsetPage() {
             <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4">
               <h2 className="text-lg font-semibold">Confirm Outbound</h2>
               <div className="bg-gray-100 p-3 rounded">
-                <p className="font-semibold">{selectedProduct.name}</p>
-                <p className="text-sm text-gray-600">
-                  SKU: {selectedProduct.sku} | Bin: {selectedProduct.bin}
+                <p className="font-semibold">{getDisplayName(selectedProduct)}</p>
+                <p className="text-sm text-gray-600 font-mono">
+                  SKU: {getDisplaySku(selectedProduct)}
                 </p>
+                <p className="text-sm text-gray-600">
+                  Bin: {selectedProduct.bin}
+                </p>
+                {/* Show metadata if available */}
+                {(selectedProduct.size || selectedProduct.color || selectedProduct.pack || selectedProduct.category) && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedProduct.size && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">{selectedProduct.size}</span>}
+                    {selectedProduct.color && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs">{selectedProduct.color}</span>}
+                    {selectedProduct.pack && <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs">{selectedProduct.pack}</span>}
+                    {selectedProduct.category && <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs">{selectedProduct.category}</span>}
+                  </div>
+                )}
               </div>
               <input
                 type="number"

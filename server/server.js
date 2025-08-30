@@ -7,6 +7,9 @@ const connectDB = require('./config/db');
 const adminRoutes = require('./routes/admin'); 
 const apiRoutes = require('./routes/api'); // Centralized route file
 const outsetRoutes = require('./routes/outset');
+const insetRoutes = require('./routes/insets'); // Add inset routes
+const inventoryRoutes = require('./routes/inventory'); // Add inventory routes
+const metadataRoutes = require('./routes/metadata'); // metadata
 
 // Load environment variables
 dotenv.config();
@@ -39,6 +42,9 @@ app.use(morgan('dev'));
 app.use('/api/admin', adminRoutes);
 app.use('/api', apiRoutes);
 app.use('/api/outset', outsetRoutes);
+app.use('/api/insets', insetRoutes); // Add inset route handler
+app.use('/api/inventory', inventoryRoutes); // Add inventory route handler
+app.use('/api/metadata', metadataRoutes); // metadata
 
 // Global Error Handler
 app.use((err, req, res, next) => {
