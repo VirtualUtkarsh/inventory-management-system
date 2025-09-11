@@ -387,15 +387,15 @@ export default function OutsetPage() {
 
   // Calculate metrics
   const totalOutbound = outsetItems.length;
-  const totalQuantity = outsetItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-  const todayCount = outsetItems.filter(item => {
-    const today = new Date();
-    const itemDate = new Date(item.createdAt);
-    return itemDate.toDateString() === today.toDateString();
-  }).length;
-  const uniqueCustomers = new Set(outsetItems.map(item => item.customerName).filter(Boolean)).size;
-  const uniqueInvoices = new Set(outsetItems.map(item => item.invoiceNo).filter(Boolean)).size;
-  const uniqueBaseSKUs = new Set(outsetItems.map(item => item.baseSku).filter(Boolean)).size;
+  // const todayCount = outsetItems.filter(item => {
+  //   const today = new Date();
+  //   const itemDate = new Date(item.createdAt);
+  //   return itemDate.toDateString() === today.toDateString();
+  // }).length;
+  // const totalQuantity = outsetItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  // const uniqueCustomers = new Set(outsetItems.map(item => item.customerName).filter(Boolean)).size;
+  // const uniqueInvoices = new Set(outsetItems.map(item => item.invoiceNo).filter(Boolean)).size;
+  // const uniqueBaseSKUs = new Set(outsetItems.map(item => item.baseSku).filter(Boolean)).size;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -407,7 +407,7 @@ export default function OutsetPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        {/* <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <div className="bg-blue-100 text-blue-800 p-4 rounded-lg shadow-sm">
             <h4 className="text-xs font-semibold uppercase tracking-wide">Total Records</h4>
             <p className="text-2xl font-bold">{totalOutbound}</p>
@@ -437,7 +437,7 @@ export default function OutsetPage() {
             <h4 className="text-xs font-semibold uppercase tracking-wide">Invoices</h4>
             <p className="text-2xl font-bold">{uniqueInvoices}</p>
           </div>
-        </div>
+        </div> */}
 
         {/* Filters Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -574,7 +574,7 @@ export default function OutsetPage() {
                   name="recentOnly"
                   checked={filters.recentOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Last 7 Days</span>
               </label>
@@ -585,7 +585,7 @@ export default function OutsetPage() {
                   name="todayOnly"
                   checked={filters.todayOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Today Only</span>
               </label>
@@ -596,7 +596,7 @@ export default function OutsetPage() {
                   name="largeQuantity"
                   checked={filters.largeQuantity}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Large Orders (≥10)</span>
               </label>

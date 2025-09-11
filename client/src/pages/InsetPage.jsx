@@ -668,7 +668,7 @@ const InsetPage = () => {
                   name="recentOnly"
                   checked={filters.recentOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Last 7 Days</span>
               </label>
@@ -679,7 +679,7 @@ const InsetPage = () => {
                   name="todayOnly"
                   checked={filters.todayOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Today Only</span>
               </label>

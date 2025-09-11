@@ -22,7 +22,7 @@ const LoginPage = () => {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h1>Sign in to Vero Lie</h1>
+        <h1>Sign in to Inventory Management</h1>
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">

@@ -17,7 +17,7 @@ const Layout = () => {
     <div className="app-layout">
       <header className="app-header">
         <div className="container flex justify-between items-center py-4">
-          <h1 className="text-2xl font-bold">Vero Lie Inventory</h1>
+          <h1 className="text-2xl font-bold">Inventory Management</h1>
           <div className="user-info flex items-center gap-4">
             <span className="text-gray-700">
               Welcome, {user?.name || 'User'} ({user?.role === 'admin' ? 'admin' : 'General'})

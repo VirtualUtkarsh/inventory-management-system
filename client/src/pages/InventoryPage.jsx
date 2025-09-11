@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from '../utils/axiosInstance';
 import { toast } from 'react-toastify';
@@ -6,11 +6,16 @@ import InventoryTable from '../components/InventoryTable';
 import 'react-toastify/dist/ReactToastify.css';
 
 const InventoryPage = () => {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [filteredInventory, setFilteredInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Refs to handle race conditions and cleanup
+  const abortControllerRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const requestIdRef = useRef(0);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -33,12 +38,41 @@ const InventoryPage = () => {
     baseSKUs: []
   });
 
-  const fetchInventory = async () => {
+  // Cleanup function for component unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const fetchInventory = useCallback(async () => {
     try {
+      // Cancel any ongoing request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+      const currentRequestId = ++requestIdRef.current;
+
       setLoading(true);
+      setError('');
+
       const { data } = await axios.get('/api/inventory', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abortControllerRef.current.signal
       });
+
+      // Check if component is still mounted and this is the latest request
+      if (!isMountedRef.current || currentRequestId !== requestIdRef.current) {
+        return;
+      }
+
       setInventory(data);
       setFilteredInventory(data);
       
@@ -59,17 +93,33 @@ const InventoryPage = () => {
       }));
       
     } catch (err) {
+      // Don't show error if request was aborted (race condition handling)
+      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
+
+      // Check if component is still mounted
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setError('Failed to fetch inventory');
       toast.error('Error loading inventory');
       console.error('Inventory fetch error:', err);
     } finally {
-      setLoading(false);
+      // Only update loading state if component is still mounted
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
-
-  useEffect(() => {
-    fetchInventory();
   }, [token]);
+
+  // Initial fetch
+  useEffect(() => {
+    if (token) {
+      fetchInventory();
+    }
+  }, [token, fetchInventory]);
 
   // Apply filters whenever filters or inventory changes
   useEffect(() => {
@@ -124,15 +174,15 @@ const InventoryPage = () => {
     setFilteredInventory(filtered);
   }, [filters, inventory]);
 
-  const handleFilterChange = (e) => {
+  const handleFilterChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
     setFilters(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-  };
+  }, []);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({
       search: '',
       baseSku: '',
@@ -143,7 +193,14 @@ const InventoryPage = () => {
       lowStock: false,
       outOfStock: false
     });
-  };
+  }, []);
+
+  // Throttled refresh to prevent multiple rapid calls
+  const throttledRefresh = useCallback(() => {
+    if (!loading) {
+      fetchInventory();
+    }
+  }, [fetchInventory, loading]);
 
   // Calculate metrics
   const totalItems = inventory.length;
@@ -271,48 +328,54 @@ const InventoryPage = () => {
           </div>
 
           {/* Quick Filters */}
-<div className="mt-4">
-  <h4 className="text-sm font-medium text-gray-700 mb-2">Stock Status</h4>
-  <div className="flex flex-wrap gap-4">
-    <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer">
-      <input
-        type="checkbox"
-        name="lowStock"
-        checked={filters.lowStock}
-        onChange={handleFilterChange}
-        className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 align-middle mt-4"
-      />
-      <span className="text-sm text-gray-700 leading-none">Low Stock (&lt; 10)</span>
-    </label>
+          <div className="mt-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Quick Filters</h4>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="lowStock"
+                  checked={filters.lowStock}
+                  onChange={handleFilterChange}
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Low Stock (&lt; 10)</span>
+              </label>
 
-    <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer">
-      <input
-        type="checkbox"
-        name="outOfStock"
-        checked={filters.outOfStock}
-        onChange={handleFilterChange}
-        className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 align-middle mt-4"
-      />
-      <span className="text-sm text-gray-700 leading-none">Out of Stock</span>
-    </label>
-  </div>
-</div>
-
+              <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="outOfStock"
+                  checked={filters.outOfStock}
+                  onChange={handleFilterChange}
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Out of Stock</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         {/* Results Summary */}
         <div className="mb-4">
           <p className="text-sm text-gray-600">
             Showing {filteredInventory.length} of {totalItems} inventory items
+            {loading && <span className="ml-2 text-blue-600">(Updating...)</span>}
           </p>
         </div>
 
         {/* Table or Error States */}
-        {loading ? (
+        {loading && inventory.length === 0 ? (
           <div className="text-center py-8 text-gray-600">Loading inventory...</div>
         ) : error ? (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded mb-4">
             {error}
+            <button 
+              onClick={throttledRefresh}
+              className="ml-4 text-sm underline hover:text-red-800"
+            >
+              Try Again
+            </button>
           </div>
         ) : inventory.length === 0 ? (
           <div className="text-center text-gray-500 py-12">
@@ -322,7 +385,7 @@ const InventoryPage = () => {
         ) : (
           <InventoryTable 
             inventory={filteredInventory} 
-            onRefresh={fetchInventory}
+            onRefresh={throttledRefresh}
           />
         )}
       </div>
