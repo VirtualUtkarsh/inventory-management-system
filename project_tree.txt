@@ -1,0 +1,104 @@
+Invertory_VL
+├── client
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── README.md
+│   ├── config
+│   │   ├── env.js
+│   │   ├── getHttpsConfig.js
+│   │   ├── modules.js
+│   │   ├── paths.js
+│   │   ├── webpack.config.js
+│   │   ├── webpackDevServer.config.js
+│   │   ├── jest
+│   │   │   ├── babelTransform.js
+│   │   │   ├── cssTransform.js
+│   │   │   └── fileTransform.js
+│   │   └── webpack
+│   │       └── persistentCache
+│   │           └── createEnvironmentHash.js
+│   ├── public
+│   │   ├── favicon.ico
+│   │   ├── index.html
+│   │   ├── logo192.png
+│   │   ├── logo512.png
+│   │   ├── manifest.json
+│   │   └── robots.txt
+│   ├── scripts
+│   │   ├── build.js
+│   │   ├── start.js
+│   │   └── test.js
+│   └── src
+│       ├── App.css
+│       ├── App.jsx
+│       ├── App.test.js
+│       ├── index.css
+│       ├── index.js
+│       ├── logo.svg
+│       ├── reportWebVitals.js
+│       ├── setupTests.js
+│       ├── InventoryTable.jsx
+│       ├── components
+│       │   ├── Layout.css
+│       │   ├── Layout.jsx
+│       │   ├── Navigation.jsx
+│       │   ├── PrivateRoute.jsx
+│       │   ├── AuthContext.jsx
+│       │   └── TableFilter.jsx
+│       ├── context
+│       │   └── (AuthContext files)
+│       ├── hooks
+│       │   └── useTableFilter.js
+│       ├── pages
+│       │   ├── AdminDashboard.jsx
+│       │   ├── InsetPage.css
+│       │   ├── InsetPage.jsx
+│       │   ├── InventoryPage.css
+│       │   ├── InventoryPage.jsx
+│       │   ├── LoginPage.css
+│       │   ├── LoginPage.jsx
+│       │   ├── OutsetPage.css
+│       │   ├── OutsetPage.jsx
+│       │   ├── RegisterPage.css
+│       │   └── RegisterPage.jsx
+│       └── utils
+│           └── axiosInstance.js
+├── server
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── server.js
+│   ├── db.js
+│   ├── config
+│   │   └── .env
+│   ├── controllers
+│   │   ├── adminController.js
+│   │   ├── insetController.js
+│   │   ├── inventoryController.js
+│   │   ├── metadataController.js
+│   │   ├── outsetController.js
+│   │   └── userController.js
+│   ├── middleware
+│   │   ├── auth.js
+│   │   └── AuditLog.js
+│   ├── models
+│   │   ├── admin.js
+│   │   ├── Color.js
+│   │   ├── Inset.js
+│   │   ├── Inventory.js
+│   │   ├── Outset.js
+│   │   ├── Pack.js
+│   │   ├── ProductCategory.js
+│   │   ├── ProductSize.js
+│   │   └── User.js
+│   └── routes
+│       ├── api.js
+│       ├── auth.js
+│       ├── insets.js
+│       ├── inventory.js
+│       ├── metadata.js
+│       └── outset.js
+├── .gitignore
+├── Collaboration.md
+├── package.json
+├── package-lock.json
+└── RunProject_README.md
