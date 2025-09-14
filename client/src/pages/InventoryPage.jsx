@@ -22,9 +22,9 @@ const InventoryPage = () => {
     search: '',
     baseSku: '',
     size: '',
-    color: '',
-    pack: '',
     category: '',
+    fromDate: '',
+    toDate: '',
     lowStock: false,
     outOfStock: false
   });
@@ -32,8 +32,6 @@ const InventoryPage = () => {
   // Metadata for filters
   const [metadata, setMetadata] = useState({
     sizes: [],
-    colors: [],
-    packs: [],
     categories: [],
     baseSKUs: []
   });
@@ -48,6 +46,127 @@ const InventoryPage = () => {
       }
     };
   }, []);
+
+  // Download CSV function
+  const downloadCSV = () => {
+    if (filteredInventory.length === 0) return;
+
+    const headers = [
+      'SKU ID',
+      'Base SKU',
+      'Name',
+      'Size',
+      'Category',
+      'Bin',
+      'Quantity',
+      'Last Updated'
+    ];
+
+    const csvData = filteredInventory.map(item => [
+      item.skuId || 'N/A',
+      item.baseSku || '',
+      item.name || '',
+      item.size || '',
+      item.category || '',
+      item.bin || '',
+      item.quantity || 0,
+      item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : new Date(item.createdAt).toLocaleDateString()
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `inventory_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Inventory data exported to CSV');
+  };
+
+  // Print table function
+  const printTable = () => {
+    if (filteredInventory.length === 0) return;
+
+    const printWindow = window.open('', '_blank');
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Inventory Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; text-align: center; }
+          .summary { text-align: center; margin: 20px 0; }
+          .summary-item { display: inline-block; margin: 0 15px; padding: 5px 10px; background-color: #f0f0f0; border-radius: 4px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 11px; }
+          th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+          .quantity-cell { text-align: center; font-weight: bold; }
+          .low-stock { color: #d97706; }
+          .out-of-stock { color: #dc2626; }
+          .print-date { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <h1>Inventory Report</h1>
+        <div class="summary">
+          <div class="summary-item">Total Items: ${filteredInventory.length}</div>
+          <div class="summary-item">Total Quantity: ${filteredInventory.reduce((sum, item) => sum + (item.quantity || 0), 0)}</div>
+          <div class="summary-item">Low Stock: ${filteredInventory.filter(item => item.quantity > 0 && item.quantity < 10).length}</div>
+          <div class="summary-item">Out of Stock: ${filteredInventory.filter(item => item.quantity === 0).length}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>SKU ID</th>
+              <th>Bin</th>
+              <th>Quantity</th>
+              <th>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredInventory.map(item => `
+              <tr>
+                <td>${item.skuId || 'N/A'}</td>
+                <td>${item.bin || ''}</td>
+                <td class="quantity-cell ${item.quantity === 0 ? 'out-of-stock' : item.quantity < 10 ? 'low-stock' : ''}">${item.quantity || 0}</td>
+                <td>${item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : new Date(item.createdAt).toLocaleDateString()}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="print-date">
+          Generated on: ${new Date().toLocaleString()}
+        </div>
+      </body>
+      </html>
+    `;
+//remvoved from print:
+/*               
+              <th>Base SKU</th>
+              <th>Name</th>
+              <th>Size</th>
+              <th>Category</th>
+
+              <td>${item.baseSku || ''}</td>
+                <td>${item.name || ''}</td>
+                <td>${item.size || ''}</td>
+                <td>${item.category || ''}</td>
+
+*/
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
 
   const fetchInventory = useCallback(async () => {
     try {
@@ -79,17 +198,13 @@ const InventoryPage = () => {
       // Extract unique values for filters
       const uniqueBaseSKUs = [...new Set(data.map(item => item.baseSku).filter(Boolean))];
       const uniqueSizes = [...new Set(data.map(item => item.size).filter(Boolean))];
-      const uniqueColors = [...new Set(data.map(item => item.color).filter(Boolean))];
-      const uniquePacks = [...new Set(data.map(item => item.pack).filter(Boolean))];
-      const uniqueCategories = [...new Set(data.map(item => item.category).filter(Boolean))];
+      // const uniqueCategories = [...new Set(data.map(item => item.category).filter(Boolean))];
       
       setMetadata(prev => ({
         ...prev,
         baseSKUs: uniqueBaseSKUs.sort(),
         sizes: uniqueSizes.sort(),
-        colors: uniqueColors.sort(),
-        packs: uniquePacks.sort(),
-        categories: uniqueCategories.sort()
+        // categories: uniqueCategories.sort()
       }));
       
     } catch (err) {
@@ -134,31 +249,44 @@ const InventoryPage = () => {
       );
     }
 
+    //sku id filter
+    //   if (filters.skuId) {
+    //   filtered = filtered.filter(item => 
+    //     (item.skuId || '').toLowerCase().includes(filters.skuId.toLowerCase())
+    //   );
+    // }
     // Base SKU filter
-    if (filters.baseSku) {
-      filtered = filtered.filter(item => item.baseSku === filters.baseSku);
+    // if (filters.baseSku) {
+    //   filtered = filtered.filter(item => item.baseSku === filters.baseSku);
+    // }
+
+    // // Size filter
+    // if (filters.size) {
+    //   filtered = filtered.filter(item => item.size === filters.size);
+    // }
+
+    // // Category filter
+    // if (filters.category) {
+    //   filtered = filtered.filter(item => item.category === filters.category);
+    // }
+
+    // Date range filters
+    if (filters.fromDate) {
+      const fromDate = new Date(filters.fromDate);
+      fromDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(item => {
+        const itemDate = new Date(item.updatedAt || item.createdAt);
+        return itemDate >= fromDate;
+      });
     }
 
-    // Size filter
-    if (filters.size) {
-      filtered = filtered.filter(item => item.size === filters.size);
-    }
-
-    // Color filter
-    if (filters.color) {
-      filtered = filtered.filter(item => 
-        item.color && item.color.includes(filters.color)
-      );
-    }
-
-    // Pack filter
-    if (filters.pack) {
-      filtered = filtered.filter(item => item.pack === filters.pack);
-    }
-
-    // Category filter
-    if (filters.category) {
-      filtered = filtered.filter(item => item.category === filters.category);
+    if (filters.toDate) {
+      const toDate = new Date(filters.toDate);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(item => {
+        const itemDate = new Date(item.updatedAt || item.createdAt);
+        return itemDate <= toDate;
+      });
     }
 
     // Low stock filter (less than 10)
@@ -169,6 +297,12 @@ const InventoryPage = () => {
     // Out of stock filter
     if (filters.outOfStock) {
       filtered = filtered.filter(item => item.quantity === 0);
+    }
+        // Bin filter
+    if (filters.bin) {
+      filtered = filtered.filter(item => 
+        (item.bin || '').toLowerCase().includes(filters.bin.toLowerCase())
+      );
     }
 
     setFilteredInventory(filtered);
@@ -185,11 +319,11 @@ const InventoryPage = () => {
   const clearFilters = useCallback(() => {
     setFilters({
       search: '',
-      baseSku: '',
-      size: '',
-      color: '',
-      pack: '',
-      category: '',
+      // baseSku: '',
+      // size: '',
+      // category: '',
+      fromDate: '',
+      toDate: '',
       lowStock: false,
       outOfStock: false
     });
@@ -279,7 +413,7 @@ const InventoryPage = () => {
             </div>
 
             {/* Base SKU Filter */}
-            <div>
+            {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Base SKU</label>
               <select
                 name="baseSku"
@@ -292,9 +426,9 @@ const InventoryPage = () => {
                   <option key={sku} value={sku}>{sku}</option>
                 ))}
               </select>
-            </div>
-
-            {/* Size Filter */}
+            </div> */}
+{/* 
+            Size Filter
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
               <select
@@ -308,10 +442,10 @@ const InventoryPage = () => {
                   <option key={size} value={size}>{size}</option>
                 ))}
               </select>
-            </div>
+            </div> */}
 
             {/* Category Filter */}
-            <div>
+            {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <select
                 name="category"
@@ -324,6 +458,38 @@ const InventoryPage = () => {
                   <option key={category} value={category}>{category}</option>
                 ))}
               </select>
+            </div> */}
+
+          <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bin Location</label>
+              <input
+                type="text"
+                name="bin"
+                value={filters.bin}
+                onChange={handleFilterChange}
+                placeholder="Filter by bin..."
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <input
+                type="date"
+                name="fromDate"
+                value={filters.fromDate}
+                onChange={handleFilterChange}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+              <input
+                type="date"
+                name="toDate"
+                value={filters.toDate}
+                onChange={handleFilterChange}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
           </div>
 
@@ -342,7 +508,7 @@ const InventoryPage = () => {
                 <span className="text-sm text-gray-700">Low Stock (&lt; 10)</span>
               </label>
 
-              <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer  ">
+              <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer">
                 <input
                   type="checkbox"
                   name="outOfStock"
@@ -356,12 +522,36 @@ const InventoryPage = () => {
           </div>
         </div>
 
-        {/* Results Summary */}
-        <div className="mb-4">
+        {/* Results Summary and Actions */}
+        <div className="flex justify-between items-center mb-4">
           <p className="text-sm text-gray-600">
             Showing {filteredInventory.length} of {totalItems} inventory items
             {loading && <span className="ml-2 text-blue-600">(Updating...)</span>}
           </p>
+          <div className="flex gap-2">
+            <button
+              onClick={downloadCSV}
+              disabled={filteredInventory.length === 0}
+              className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors flex items-center gap-1"
+              title="Download filtered data as CSV"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              CSV
+            </button>
+            <button
+              onClick={printTable}
+              disabled={filteredInventory.length === 0}
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors flex items-center gap-1"
+              title="Print filtered data"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print
+            </button>
+          </div>
         </div>
 
         {/* Table or Error States */}

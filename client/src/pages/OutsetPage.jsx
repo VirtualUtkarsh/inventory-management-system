@@ -18,14 +18,10 @@ export default function OutsetPage() {
   const [loading, setLoading] = useState({ inventory: true, outsets: true });
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter states - REMOVED name from search filter
+  // Simplified filter states - removed size, color, pack, category, baseSku
   const [filters, setFilters] = useState({
     search: '',
-    baseSku: '',
-    size: '',
-    color: '',
-    pack: '',
-    category: '',
+    skuId: '',
     customer: '',
     invoiceNo: '',
     bin: '',
@@ -43,7 +39,7 @@ export default function OutsetPage() {
         axiosInstance.get('/api/inventory', {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        axiosInstance.get('/api/outset', {
+        axiosInstance.get('/api/outsets', {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -61,44 +57,26 @@ export default function OutsetPage() {
     fetchData();
   }, [fetchData]);
 
-  // Apply filters whenever filters or outsets change - REMOVED name from search
+  // Simplified filters - removed baseSku, size, color, pack, category filters
   useEffect(() => {
     let filtered = [...outsetItems];
 
-    // Search filter (searches SKU ID, customer, invoice, and bin) - REMOVED name
+    // Search filter (searches SKU ID, customer, invoice, and bin)
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(item => 
-        (item.skuId || item.sku || '').toLowerCase().includes(searchTerm) ||
+        (item.skuId || '').toLowerCase().includes(searchTerm) ||
         (item.customerName || '').toLowerCase().includes(searchTerm) ||
         (item.invoiceNo || '').toLowerCase().includes(searchTerm) ||
         (item.bin || '').toLowerCase().includes(searchTerm)
       );
     }
 
-    // Base SKU filter
-    if (filters.baseSku) {
-      filtered = filtered.filter(item => item.baseSku === filters.baseSku);
-    }
-
-    // Size filter
-    if (filters.size) {
-      filtered = filtered.filter(item => item.size === filters.size);
-    }
-
-    // Color filter
-    if (filters.color) {
-      filtered = filtered.filter(item => item.color === filters.color);
-    }
-
-    // Pack filter
-    if (filters.pack) {
-      filtered = filtered.filter(item => item.pack === filters.pack);
-    }
-
-    // Category filter
-    if (filters.category) {
-      filtered = filtered.filter(item => item.category === filters.category);
+    // SKU ID filter
+    if (filters.skuId) {
+      filtered = filtered.filter(item => 
+        (item.skuId || '').toLowerCase().includes(filters.skuId.toLowerCase())
+      );
     }
 
     // Customer filter
@@ -188,11 +166,7 @@ export default function OutsetPage() {
   const clearFilters = () => {
     setFilters({
       search: '',
-      baseSku: '',
-      size: '',
-      color: '',
-      pack: '',
-      category: '',
+      skuId: '',
       customer: '',
       invoiceNo: '',
       bin: '',
@@ -224,7 +198,7 @@ export default function OutsetPage() {
     try {
       setLoading(prev => ({ ...prev, outsets: true }));
 
-      const { data } = await axiosInstance.post('/api/outset', {
+      const { data } = await axiosInstance.post('/api/outsets', {
         skuId: selectedProduct.skuId,
         quantity: parseInt(quantity),
         customerName,
@@ -259,20 +233,14 @@ export default function OutsetPage() {
     return item.skuId || item.sku || 'N/A';
   };
 
-  // REMOVED getDisplayName function - no longer needed
-
-  // CSV Download function - REMOVED Name column
+  // Simplified CSV Download function
   const downloadCSV = () => {
     if (filteredOutsets.length === 0) return;
     
     const headers = [
       'Date',
       'Time',
-      'SKU',
-      'Size',
-      'Color',
-      'Pack',
-      'Category',
+      'SKU ID',
       'Bin',
       'Quantity',
       'Customer',
@@ -284,10 +252,6 @@ export default function OutsetPage() {
       new Date(item.createdAt).toLocaleDateString(),
       new Date(item.createdAt).toLocaleTimeString(),
       getDisplaySku(item),
-      item.size || '',
-      item.color || '',
-      item.pack || '',
-      item.category || '',
       item.bin || '',
       item.quantity,
       item.customerName || '',
@@ -310,7 +274,7 @@ export default function OutsetPage() {
     document.body.removeChild(link);
   };
 
-  // Print function - REMOVED Name column
+  // Simplified Print function
   const printTable = () => {
     if (filteredOutsets.length === 0) return;
     
@@ -324,13 +288,10 @@ export default function OutsetPage() {
           body { font-family: Arial, sans-serif; margin: 20px; }
           h1 { color: #333; text-align: center; }
           table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
           th { background-color: #f2f2f2; font-weight: bold; }
-          .no-print { display: none; }
-          @media print {
-            body { margin: 0; }
-            .no-print { display: none; }
-          }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+          .print-date { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
         </style>
       </head>
       <body>
@@ -342,10 +303,9 @@ export default function OutsetPage() {
           <thead>
             <tr>
               <th>Date</th>
-              <th>SKU</th>
-              <th>Details</th>
+              <th>SKU ID</th>
               <th>Bin</th>
-              <th>Qty</th>
+              <th>Quantity</th>
               <th>Customer</th>
               <th>Invoice</th>
               <th>User</th>
@@ -356,7 +316,6 @@ export default function OutsetPage() {
               <tr>
                 <td>${new Date(item.createdAt).toLocaleDateString()}</td>
                 <td>${getDisplaySku(item)}</td>
-                <td>${[item.size, item.color, item.pack, item.category].filter(Boolean).join(', ')}</td>
                 <td>${item.bin || ''}</td>
                 <td>-${item.quantity}</td>
                 <td>${item.customerName || ''}</td>
@@ -366,6 +325,9 @@ export default function OutsetPage() {
             `).join('')}
           </tbody>
         </table>
+        <div class="print-date">
+          Generated on: ${new Date().toLocaleString()}
+        </div>
       </body>
       </html>
     `;
@@ -377,7 +339,6 @@ export default function OutsetPage() {
     printWindow.close();
   };
 
-  // Calculate metrics
   const totalOutbound = outsetItems.length;
 
   return (
@@ -389,7 +350,7 @@ export default function OutsetPage() {
           <p className="text-gray-600">Track and manage outgoing inventory items</p>
         </div>
 
-        {/* Filters Section */}
+        {/* Simplified Filters Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
@@ -401,8 +362,8 @@ export default function OutsetPage() {
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Search - Updated placeholder text to remove "Name" */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            {/* Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
               <input
@@ -415,76 +376,42 @@ export default function OutsetPage() {
               />
             </div>
 
-            {/* Base SKU Filter */}
+            {/* SKU ID Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Base SKU</label>
-              <select
-                name="baseSku"
-                value={filters.baseSku}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Base SKUs</option>
-                {[...new Set(outsetItems.map(item => item.baseSku).filter(Boolean))].sort().map(sku => (
-                  <option key={sku} value={sku}>{sku}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Size Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
-              <select
-                name="size"
-                value={filters.size}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Sizes</option>
-                {[...new Set(outsetItems.map(item => item.size).filter(Boolean))].sort().map(size => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select
-                name="category"
-                value={filters.category}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Categories</option>
-                {[...new Set(outsetItems.map(item => item.category).filter(Boolean))].sort().map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Customer Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SKU ID</label>
               <input
                 type="text"
-                name="customer"
-                value={filters.customer}
+                name="skuId"
+                value={filters.skuId}
                 onChange={handleFilterChange}
-                placeholder="Customer name..."
+                placeholder="Filter by SKU ID..."
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {/* Bin Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bin Location</label>
+              <input
+                type="text"
+                name="bin"
+                value={filters.bin}
+                onChange={handleFilterChange}
+                placeholder="Filter by bin..."
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            {/* Invoice No Filter */}
+
+
+            {/* User Name Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Added By</label>
               <input
                 type="text"
-                name="invoiceNo"
-                value={filters.invoiceNo}
+                name="userName"
+                value={filters.userName}
                 onChange={handleFilterChange}
-                placeholder="Invoice number..."
+                placeholder="Filter by user..."
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -512,6 +439,31 @@ export default function OutsetPage() {
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            {/* Customer Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+              <input
+                type="text"
+                name="customer"
+                value={filters.customer}
+                onChange={handleFilterChange}
+                placeholder="Customer name..."
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Invoice No Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+              <input
+                type="text"
+                name="invoiceNo"
+                value={filters.invoiceNo}
+                onChange={handleFilterChange}
+                placeholder="Invoice number..."
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           {/* Quick Filters */}
@@ -524,7 +476,7 @@ export default function OutsetPage() {
                   name="recentOnly"
                   checked={filters.recentOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Last 7 Days</span>
               </label>
@@ -535,7 +487,7 @@ export default function OutsetPage() {
                   name="todayOnly"
                   checked={filters.todayOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Today Only</span>
               </label>
@@ -546,7 +498,7 @@ export default function OutsetPage() {
                   name="largeQuantity"
                   checked={filters.largeQuantity}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Large Orders (≥10)</span>
               </label>
@@ -555,7 +507,7 @@ export default function OutsetPage() {
         </div>
 
         {/* Results Summary and Actions */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
           <p className="text-sm text-gray-600">
             Showing {filteredOutsets.length} of {totalOutbound} outbound records
           </p>
@@ -590,13 +542,13 @@ export default function OutsetPage() {
           <h2 className="text-2xl font-bold text-gray-800">Outbound Records</h2>
           <button
             onClick={() => setShowProductModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md touch-manipulation"
           >
             + New Outbound
           </button>
         </div>
 
-        {/* Outbound History Table - REMOVED Name column */}
+        {/* Simplified Outbound History Table */}
         <div className="bg-white p-4 rounded-lg shadow">
           {loading.outsets ? (
             <div className="text-center py-8 text-gray-600">Loading outbound records...</div>
@@ -613,8 +565,7 @@ export default function OutsetPage() {
                 <thead className="bg-gray-50 text-left text-gray-600 uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3 text-xs font-medium">Date</th>
-                    <th className="px-4 py-3 text-xs font-medium">SKU</th>
-                    <th className="px-4 py-3 text-xs font-medium">Details</th>
+                    <th className="px-4 py-3 text-xs font-medium">SKU ID</th>
                     <th className="px-4 py-3 text-xs font-medium">Bin</th>
                     <th className="px-4 py-3 text-xs font-medium">Qty</th>
                     <th className="px-4 py-3 text-xs font-medium">Customer</th>
@@ -632,18 +583,6 @@ export default function OutsetPage() {
                       <td className="px-4 py-2 font-mono text-blue-800 font-semibold">
                         {getDisplaySku(item)}
                       </td>
-                      <td className="px-4 py-2">
-                        {(item.size || item.color || item.pack || item.category) ? (
-                          <div className="flex flex-wrap gap-1">
-                            {item.size && <span className="bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-xs">{item.size}</span>}
-                            {item.color && <span className="bg-green-100 text-green-800 px-1 py-0.5 rounded text-xs">{item.color}</span>}
-                            {item.pack && <span className="bg-purple-100 text-purple-800 px-1 py-0.5 rounded text-xs">{item.pack}</span>}
-                            {item.category && <span className="bg-orange-100 text-orange-800 px-1 py-0.5 rounded text-xs">{item.category}</span>}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
                       <td className="px-4 py-2">{item.bin}</td>
                       <td className="px-4 py-2 text-red-600 font-semibold">-{item.quantity}</td>
                       <td className="px-4 py-2">{item.customerName}</td>
@@ -657,7 +596,7 @@ export default function OutsetPage() {
           )}
         </div>
 
-        {/* Product Selection Modal - REMOVED name from search and display */}
+        {/* Mobile-Optimized Product Selection Modal */}
         {showProductModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg w-full max-w-md max-h-[80vh] flex flex-col">
@@ -686,14 +625,7 @@ export default function OutsetPage() {
                     const sku = getDisplaySku(product).toLowerCase();
                     const bin = product.bin.toLowerCase();
                     
-                    return (
-                      sku.includes(search) ||
-                      bin.includes(search) ||
-                      (product.size && product.size.toLowerCase().includes(search)) ||
-                      (product.color && product.color.toLowerCase().includes(search)) ||
-                      (product.pack && product.pack.toLowerCase().includes(search)) ||
-                      (product.category && product.category.toLowerCase().includes(search))
-                    );
+                    return sku.includes(search) || bin.includes(search);
                   });
 
                   if (filteredInventory.length === 0) {
@@ -708,22 +640,14 @@ export default function OutsetPage() {
                     <div
                       key={product._id}
                       onClick={() => handleProductSelect(product)}
-                      className="border p-3 rounded-lg mb-2 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
+                      className="border p-3 rounded-lg mb-2 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 touch-manipulation"
                     >
                       <div className="text-sm text-gray-600 mb-1">
                         SKU: <span className="font-mono">{getDisplaySku(product)}</span>
                       </div>
-                      <div className="text-sm text-gray-600 mb-2">
+                      <div className="text-sm text-gray-600">
                         Qty: {product.quantity} | Bin: {product.bin}
                       </div>
-                      {(product.size || product.color || product.pack || product.category) && (
-                        <div className="flex flex-wrap gap-1">
-                          {product.size && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">{product.size}</span>}
-                          {product.color && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs">{product.color}</span>}
-                          {product.pack && <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs">{product.pack}</span>}
-                          {product.category && <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs">{product.category}</span>}
-                        </div>
-                      )}
                     </div>
                   ));
                 })()}
@@ -734,7 +658,7 @@ export default function OutsetPage() {
                     setShowProductModal(false);
                     setSearchTerm('');
                   }}
-                  className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+                  className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors touch-manipulation"
                 >
                   Cancel
                 </button>
@@ -743,10 +667,10 @@ export default function OutsetPage() {
           </div>
         )}
 
-        {/* Outbound Confirmation Modal - REMOVED name display */}
+        {/* Mobile-Optimized Outbound Confirmation Modal */}
         {showOutsetModal && selectedProduct && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4">
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-md space-y-4 p-6">
               <h2 className="text-lg font-semibold">Confirm Outbound</h2>
               <div className="bg-gray-100 p-3 rounded">
                 <p className="text-sm text-gray-600 font-mono">
@@ -755,14 +679,6 @@ export default function OutsetPage() {
                 <p className="text-sm text-gray-600">
                   Bin: {selectedProduct.bin}
                 </p>
-                {(selectedProduct.size || selectedProduct.color || selectedProduct.pack || selectedProduct.category) && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {selectedProduct.size && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">{selectedProduct.size}</span>}
-                    {selectedProduct.color && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs">{selectedProduct.color}</span>}
-                    {selectedProduct.pack && <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs">{selectedProduct.pack}</span>}
-                    {selectedProduct.category && <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs">{selectedProduct.category}</span>}
-                  </div>
-                )}
               </div>
               <input
                 type="number"
@@ -774,36 +690,36 @@ export default function OutsetPage() {
                     Math.max(1, Math.min(Number(e.target.value), selectedProduct.quantity))
                   )
                 }
-                className="w-full border px-3 py-2 rounded"
+                className="w-full border px-3 py-2 rounded touch-manipulation"
                 placeholder="Quantity"
               />
               <input
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full border px-3 py-2 rounded"
+                className="w-full border px-3 py-2 rounded touch-manipulation"
                 placeholder="Customer Name"
               />
               <input
                 type="text"
                 value={invoiceNo}
                 onChange={(e) => setInvoiceNo(e.target.value)}
-                className="w-full border px-3 py-2 rounded"
+                className="w-full border px-3 py-2 rounded touch-manipulation"
                 placeholder="Invoice/Reference No"
               />
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <button
                   onClick={() => {
                     setShowOutsetModal(false);
                     setShowProductModal(true);
                   }}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded"
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded touch-manipulation flex-1"
                 >
                   Back
                 </button>
                 <button
                   onClick={handleConfirmOutset}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 touch-manipulation flex-1"
                 >
                   {loading.outsets ? 'Processing...' : 'Confirm'}
                 </button>

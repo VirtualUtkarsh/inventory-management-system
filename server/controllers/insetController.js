@@ -1,3 +1,4 @@
+// server/controllers/insetController.js
 const Inset = require('../models/Inset');
 const Inventory = require('../models/Inventory');
 
@@ -8,27 +9,17 @@ const createInset = async (req, res) => {
     console.log('Request body:', req.body);
     console.log('User from auth middleware:', req.userId, req.username);
 
-    // Extract data from request body - skuId is required
+    // Extract data from request body - only simplified fields
     const { 
       skuId, 
-      baseSku, 
-      size, 
-      color, 
-      pack, 
-      category, 
       bin, 
       quantity, 
       user 
     } = req.body;
 
-    // Validation - Check all required fields
+    // Validation - Check only required simplified fields
     const requiredFields = {
       skuId: 'SKU ID',
-      baseSku: 'Base SKU',
-      size: 'Size',
-      color: 'Color', 
-      pack: 'Pack',
-      category: 'Category',
       bin: 'Bin Location',
       quantity: 'Quantity'
     };
@@ -55,14 +46,9 @@ const createInset = async (req, res) => {
 
     console.log('✅ All validation passed');
 
-    // Create inset document
+    // Create inset document with simplified structure
     const insetData = {
       skuId: skuId.trim().toUpperCase(),
-      baseSku: baseSku.trim().toUpperCase(),
-      size: size.trim().toUpperCase(),
-      color: color.trim().toUpperCase(),
-      pack: pack.trim(),
-      category: category.trim(),
       bin: bin.trim().toUpperCase(),
       quantity: Number(quantity),
       user: {
@@ -79,19 +65,13 @@ const createInset = async (req, res) => {
     console.log('✅ Inset saved successfully:', savedInset._id);
     console.log('Manual SKU ID:', savedInset.skuId);
 
-    // Update inventory
+    // Update inventory - simplified call
     try {
       console.log('📦 Updating inventory...');
       const inventoryItem = await Inventory.updateStock(
         savedInset.skuId,
         savedInset.quantity,
-        savedInset.bin,
-        null, // name no longer used
-        savedInset.baseSku,
-        savedInset.size,
-        savedInset.color,
-        savedInset.pack,
-        savedInset.category
+        savedInset.bin
       );
       console.log('✅ Inventory updated:', inventoryItem.skuId);
     } catch (invError) {
@@ -134,30 +114,136 @@ const createInset = async (req, res) => {
   }
 };
 
-// Get all insets (inbound history)
-const getInsets = async (req, res) => {
+// Get all insets
+const getAllInsets = async (req, res) => {
   try {
-    console.log('=== FETCHING INSETS ===');
-    
     const insets = await Inset.find()
-      .sort({ createdAt: -1 }) 
+      .sort({ createdAt: -1 })
       .lean();
-    
-    console.log(`✅ Found ${insets.length} insets`);
-    
+
     res.status(200).json(insets);
   } catch (error) {
-    console.error('=== FETCH INSETS ERROR ===');
-    console.error('Error details:', error);
+    console.error('Get insets error:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch insets', 
+      error: error.message 
+    });
+  }
+};
+
+// Get inset by ID
+const getInsetById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const inset = await Inset.findById(id);
+
+    if (!inset) {
+      return res.status(404).json({ message: 'Inset not found' });
+    }
+
+    res.status(200).json(inset);
+  } catch (error) {
+    console.error('Get inset by ID error:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch inset', 
+      error: error.message 
+    });
+  }
+};
+
+// Update inset
+const updateInset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { skuId, bin, quantity } = req.body;
+
+    // Validation
+    if (!skuId || !bin || !quantity) {
+      return res.status(400).json({ 
+        message: 'SKU ID, bin location, and quantity are required' 
+      });
+    }
+
+    if (quantity <= 0) {
+      return res.status(400).json({ 
+        message: 'Quantity must be greater than 0' 
+      });
+    }
+
+    const updatedInset = await Inset.findByIdAndUpdate(
+      id,
+      {
+        skuId: skuId.trim().toUpperCase(),
+        bin: bin.trim().toUpperCase(),
+        quantity: Number(quantity)
+      },
+      { 
+        new: true, 
+        runValidators: true 
+      }
+    );
+
+    if (!updatedInset) {
+      return res.status(404).json({ message: 'Inset not found' });
+    }
+
+    res.status(200).json({ 
+      message: 'Inset updated successfully', 
+      inset: updatedInset 
+    });
+
+  } catch (error) {
+    console.error('Update inset error:', error);
+    
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'SKU ID already exists. Please use a different SKU ID.' 
+      });
+    }
+    
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        message: 'Validation failed', 
+        errors: validationErrors 
+      });
+    }
     
     res.status(500).json({ 
-      message: 'Failed to fetch inset history',
-      error: error.message
+      message: 'Failed to update inset', 
+      error: error.message 
+    });
+  }
+};
+
+// Delete inset
+const deleteInset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedInset = await Inset.findByIdAndDelete(id);
+
+    if (!deletedInset) {
+      return res.status(404).json({ message: 'Inset not found' });
+    }
+
+    res.status(200).json({ 
+      message: 'Inset deleted successfully', 
+      inset: deletedInset 
+    });
+
+  } catch (error) {
+    console.error('Delete inset error:', error);
+    res.status(500).json({ 
+      message: 'Failed to delete inset', 
+      error: error.message 
     });
   }
 };
 
 module.exports = {
   createInset,
-  getInsets
+  getAllInsets,
+  getInsetById,
+  updateInset,
+  deleteInset
 };

@@ -8,40 +8,21 @@ const InsetPage = () => {
   const { user, token } = useAuth();
   
   const [formData, setFormData] = useState({
-    baseSku: '',
-    size: '',
-    color: '',
-    pack: '',
-    category: '',
-    // REMOVED: name: '',
-    // REMOVED: orderNo: '',
+    skuId: '',
     bin: '',
     quantity: ''
-  });
-
-  const [metadata, setMetadata] = useState({
-    sizes: [],
-    colors: [],
-    packs: [],
-    categories: []
   });
 
   const [insets, setInsets] = useState([]);
   const [filteredInsets, setFilteredInsets] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [metadataLoading, setMetadataLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter states - REMOVED orderNo filter
+  // Simplified filter states
   const [filters, setFilters] = useState({
     search: '',
-    baseSku: '',
-    size: '',
-    color: '',
-    pack: '',
-    category: '',
-    // REMOVED: orderNo: '',
+    skuId: '',
     bin: '',
     userName: '',
     dateFrom: '',
@@ -50,10 +31,7 @@ const InsetPage = () => {
     todayOnly: false
   });
 
-  // Auto-generated SKU preview
-  const [previewSku, setPreviewSku] = useState('');
-
-  // Fetch insets using useCallback to fix dependency warning
+  // Fetch insets using useCallback
   const fetchInsets = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -71,51 +49,15 @@ const InsetPage = () => {
     }
   }, [token]);
 
-  // Fetch metadata on component mount
-  useEffect(() => {
-    const fetchMetadata = async () => {
-      try {
-        const [sizesRes, colorsRes, packsRes, categoriesRes] = await Promise.all([
-          axiosInstance.get('/api/metadata/sizes', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axiosInstance.get('/api/metadata/colors', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axiosInstance.get('/api/metadata/packs', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axiosInstance.get('/api/metadata/categories', {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-        ]);
-        
-        setMetadata({
-          sizes: sizesRes.data,
-          colors: colorsRes.data,
-          packs: packsRes.data,
-          categories: categoriesRes.data
-        });
-      } catch (err) {
-        console.error('Error fetching metadata:', err);
-        setError('Failed to load metadata. Please ensure you have admin access and metadata is configured.');
-      } finally {
-        setMetadataLoading(false);
-      }
-    };
-
-    fetchMetadata();
-  }, [token]);
-
   useEffect(() => {
     fetchInsets();
   }, [fetchInsets]);
 
-  // Apply filters whenever filters or insets changes - REMOVED name and orderNo filters
+  // Apply filters whenever filters or insets changes
   useEffect(() => {
     let filtered = [...insets];
 
-    // Search filter (searches SKU ID and bin) - REMOVED name and orderNo from search
+    // Search filter (searches SKU ID and bin)
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(item => 
@@ -124,32 +66,12 @@ const InsetPage = () => {
       );
     }
 
-    // Base SKU filter
-    if (filters.baseSku) {
-      filtered = filtered.filter(item => item.baseSku === filters.baseSku);
+    // SKU ID filter
+    if (filters.skuId) {
+      filtered = filtered.filter(item => 
+        (item.skuId || '').toLowerCase().includes(filters.skuId.toLowerCase())
+      );
     }
-
-    // Size filter
-    if (filters.size) {
-      filtered = filtered.filter(item => item.size === filters.size);
-    }
-
-    // Color filter
-    if (filters.color) {
-      filtered = filtered.filter(item => item.color === filters.color);
-    }
-
-    // Pack filter
-    if (filters.pack) {
-      filtered = filtered.filter(item => item.pack === filters.pack);
-    }
-
-    // Category filter
-    if (filters.category) {
-      filtered = filtered.filter(item => item.category === filters.category);
-    }
-
-    // REMOVED: Order number filter
 
     // Bin filter
     if (filters.bin) {
@@ -219,12 +141,7 @@ const InsetPage = () => {
   const clearFilters = () => {
     setFilters({
       search: '',
-      baseSku: '',
-      size: '',
-      color: '',
-      pack: '',
-      category: '',
-      // REMOVED: orderNo: '',
+      skuId: '',
       bin: '',
       userName: '',
       dateFrom: '',
@@ -233,16 +150,6 @@ const InsetPage = () => {
       todayOnly: false
     });
   };
-
-  // Update SKU preview when relevant fields change
-  useEffect(() => {
-    const { baseSku, size, color, pack } = formData;
-    if (baseSku && size && color && pack) {
-      setPreviewSku(`${baseSku}-${size}-${color}-${pack}`);
-    } else {
-      setPreviewSku('');
-    }
-  }, [formData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -254,9 +161,9 @@ const InsetPage = () => {
     if (error) setError(null);
   };
 
-  // Form validation function - REMOVED name and orderNo validation
+  // Simplified form validation
   const validateForm = () => {
-    const requiredFields = ['baseSku', 'size', 'color', 'pack', 'category', 'bin', 'quantity'];
+    const requiredFields = ['skuId', 'bin', 'quantity'];
     
     for (let field of requiredFields) {
       if (!formData[field] || formData[field] === '' || formData[field] === 0) {
@@ -284,15 +191,9 @@ const InsetPage = () => {
     setLoading(true);
     setError(null);
 
-    // Prepare submission data with user info - REMOVED name and orderNo
+    // Prepare submission data with user info
     const submissionData = {
-      baseSku: formData.baseSku.trim().toUpperCase(),
-      size: formData.size.trim().toUpperCase(),
-      color: formData.color.trim().toUpperCase(),
-      pack: formData.pack.trim(),
-      category: formData.category.trim(),
-      // REMOVED: name: formData.name.trim(),
-      // REMOVED: orderNo: formData.orderNo.trim(),
+      skuId: formData.skuId.trim().toUpperCase(),
       bin: formData.bin.trim().toUpperCase(),
       quantity: Number(formData.quantity),
       user: {
@@ -306,15 +207,9 @@ const InsetPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Reset form - REMOVED name and orderNo
+      // Reset form
       setFormData({
-        baseSku: '',
-        size: '',
-        color: '',
-        pack: '',
-        category: '',
-        // REMOVED: name: '',
-        // REMOVED: orderNo: '',
+        skuId: '',
         bin: '',
         quantity: ''
       });
@@ -332,13 +227,7 @@ const InsetPage = () => {
 
   const resetForm = () => {
     setFormData({
-      baseSku: '',
-      size: '',
-      color: '',
-      pack: '',
-      category: '',
-      // REMOVED: name: '',
-      // REMOVED: orderNo: '',
+      skuId: '',
       bin: '',
       quantity: ''
     });
@@ -346,19 +235,12 @@ const InsetPage = () => {
     setError(null);
   };
 
-  // Download CSV function - REMOVED Name and Order No columns
+  // Download CSV function
   const downloadCSV = () => {
     if (filteredInsets.length === 0) return;
 
     const headers = [
-      'Generated SKU',
-      'Base SKU', 
-      // REMOVED: 'Name',
-      'Size',
-      'Color',
-      'Pack',
-      'Category',
-      // REMOVED: 'Order No',
+      'SKU ID',
       'Bin',
       'Quantity',
       'Added By',
@@ -367,13 +249,6 @@ const InsetPage = () => {
 
     const csvData = filteredInsets.map(item => [
       item.skuId || 'N/A',
-      item.baseSku || '',
-      // REMOVED: item.name || '',
-      item.size || '',
-      item.color || '',
-      item.pack || '',
-      item.category || '',
-      // REMOVED: item.orderNo || '',
       item.bin || '',
       item.quantity || 0,
       item.user?.name || 'System',
@@ -395,7 +270,7 @@ const InsetPage = () => {
     document.body.removeChild(link);
   };
 
-  // Print table function - REMOVED Name and Order No columns
+  // Print table function
   const printTable = () => {
     if (filteredInsets.length === 0) return;
 
@@ -421,12 +296,7 @@ const InsetPage = () => {
         <table>
           <thead>
             <tr>
-              <th>Generated SKU</th>
-              <th>Base SKU</th>
-              <th>Size</th>
-              <th>Color</th>
-              <th>Pack</th>
-              <th>Category</th>
+              <th>SKU ID</th>
               <th>Bin</th>
               <th>Quantity</th>
               <th>Added By</th>
@@ -437,11 +307,6 @@ const InsetPage = () => {
             ${filteredInsets.map(item => `
               <tr>
                 <td>${item.skuId || 'N/A'}</td>
-                <td>${item.baseSku || ''}</td>
-                <td>${item.size || ''}</td>
-                <td>${item.color || ''}</td>
-                <td>${item.pack || ''}</td>
-                <td>${item.category || ''}</td>
                 <td>${item.bin || ''}</td>
                 <td>+${item.quantity || 0}</td>
                 <td>${item.user?.name || 'System'}</td>
@@ -467,10 +332,6 @@ const InsetPage = () => {
   // Calculate metrics
   const totalInbound = insets.length;
 
-  if (metadataLoading) {
-    return <div className="p-4 text-lg">Loading metadata...</div>;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
@@ -480,7 +341,7 @@ const InsetPage = () => {
           <p className="text-gray-600">Track and manage incoming inventory items</p>
         </div>
 
-        {/* Filters Section - REMOVED Order Number filter */}
+        {/* Filters Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
@@ -492,8 +353,8 @@ const InsetPage = () => {
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Search - Updated placeholder text */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            {/* Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
               <input
@@ -506,55 +367,18 @@ const InsetPage = () => {
               />
             </div>
 
-            {/* Base SKU Filter */}
+            {/* SKU ID Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Base SKU</label>
-              <select
-                name="baseSku"
-                value={filters.baseSku}
+              <label className="block text-sm font-medium text-gray-700 mb-1">SKU ID</label>
+              <input
+                type="text"
+                name="skuId"
+                value={filters.skuId}
                 onChange={handleFilterChange}
+                placeholder="Filter by SKU ID..."
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Base SKUs</option>
-                {[...new Set(insets.map(item => item.baseSku).filter(Boolean))].sort().map(sku => (
-                  <option key={sku} value={sku}>{sku}</option>
-                ))}
-              </select>
+              />
             </div>
-
-            {/* Size Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
-              <select
-                name="size"
-                value={filters.size}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Sizes</option>
-                {[...new Set(insets.map(item => item.size).filter(Boolean))].sort().map(size => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select
-                name="category"
-                value={filters.category}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Categories</option>
-                {[...new Set(insets.map(item => item.category).filter(Boolean))].sort().map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* REMOVED: Order No Filter */}
 
             {/* Bin Filter */}
             <div>
@@ -564,7 +388,20 @@ const InsetPage = () => {
                 name="bin"
                 value={filters.bin}
                 onChange={handleFilterChange}
-                placeholder="Search bin..."
+                placeholder="Filter by bin..."
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* User Name Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Added By</label>
+              <input
+                type="text"
+                name="userName"
+                value={filters.userName}
+                onChange={handleFilterChange}
+                placeholder="Filter by user..."
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -604,7 +441,7 @@ const InsetPage = () => {
                   name="recentOnly"
                   checked={filters.recentOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Last 7 Days</span>
               </label>
@@ -615,7 +452,7 @@ const InsetPage = () => {
                   name="todayOnly"
                   checked={filters.todayOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Today Only</span>
               </label>
@@ -678,114 +515,21 @@ const InsetPage = () => {
                 </div>
               )}
               
-              {/* SKU Generation Section */}
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                <h4 className="text-md font-medium mb-3 text-blue-800">SKU Generation</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Base SKU */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Base SKU *</label>
-                    <input
-                      type="text"
-                      name="baseSku"
-                      value={formData.baseSku}
-                      onChange={handleChange}
-                      placeholder="e.g. TS1156"
-                      required
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  {/* Size Dropdown */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Size *</label>
-                    <select
-                      name="size"
-                      value={formData.size}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Size</option>
-                      {metadata.sizes.map(size => (
-                        <option key={size._id} value={size.name}>
-                          {size.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Color Dropdown */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Color *</label>
-                    <select
-                      name="color"
-                      value={formData.color}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Color</option>
-                      {metadata.colors.map(color => (
-                        <option key={color._id} value={color.name}>
-                          {color.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Pack Dropdown */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pack *</label>
-                    <select
-                      name="pack"
-                      value={formData.pack}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Pack</option>
-                      {metadata.packs.map(pack => (
-                        <option key={pack._id} value={pack.name}>
-                          {pack.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* SKU Preview */}
-                {previewSku && (
-                  <div className="mt-3 p-3 bg-white rounded border-l-4 border-blue-500">
-                    <span className="text-sm text-gray-600">Generated SKU: </span>
-                    <span className="font-mono font-bold text-blue-800">{previewSku}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Additional Details - REMOVED name and orderNo fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                {/* Category */}
+              {/* Simplified form with only 3 fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* SKU ID */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-                  <select
-                    name="category"
-                    value={formData.category}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SKU ID *</label>
+                  <input
+                    type="text"
+                    name="skuId"
+                    value={formData.skuId}
                     onChange={handleChange}
+                    placeholder="e.g. TS1156-L-RED-PACK10"
                     required
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Category</option>
-                    {metadata.categories.map(category => (
-                      <option key={category._id} value={category.name}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
-
-                {/* REMOVED: Item Name field */}
-                {/* REMOVED: Order Number field */}
 
                 {/* Bin Location */}
                 <div>
@@ -836,7 +580,7 @@ const InsetPage = () => {
             </form>
           )}
 
-          {/* Inbound History Table - REMOVED Name and Order No columns */}
+          {/* Inbound History Table - Simplified */}
           <div className="overflow-x-auto mt-6 w-full">
             {loading && insets.length === 0 ? (
               <div className="text-center py-8 text-gray-600">Loading inbound records...</div>
@@ -851,12 +595,8 @@ const InsetPage = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Generated SKU</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base SKU</th>
-                    {/* REMOVED: Name column */}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                    {/* REMOVED: Order No column */}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bin</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bin Location</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added By</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
@@ -868,17 +608,6 @@ const InsetPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-blue-800 font-semibold">
                         {inset.skuId || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{inset.baseSku}</td>
-                      {/* REMOVED: Name column */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div className="flex flex-wrap gap-1">
-                          {inset.size && <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{inset.size}</span>}
-                          {inset.color && <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">{inset.color}</span>}
-                          {inset.pack && <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">{inset.pack}</span>}
-                          {inset.category && <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">{inset.category}</span>}
-                        </div>
-                      </td>
-                      {/* REMOVED: Order No column */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{inset.bin}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">+{inset.quantity}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{inset.user?.name || 'System'}</td>

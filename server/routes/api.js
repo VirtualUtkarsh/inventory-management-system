@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { check } = require('express-validator');
-const {auth} = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const authRoutes = require('./auth'); // Import your auth routes
 const inventoryController = require('../controllers/inventoryController');
 const insetController = require('../controllers/insetController');
@@ -16,12 +16,11 @@ router.get('/inventory', auth, inventoryController.getInventory);
 router.post('/inventory/update', auth, inventoryController.updateQuantity);
 
 router.post('/insets', auth, insetController.createInset);
-router.get('/insets', auth, insetController.getInsets);
+router.get('/insets', auth, insetController.getAllInsets);  // <-- fixed here
 
 router.post('/outsets', auth, outsetController.createOutset);
 router.get('/outsets', auth, outsetController.getOutsets);
 
 router.use('/admin', adminRoutes);
-
 
 module.exports = router;
