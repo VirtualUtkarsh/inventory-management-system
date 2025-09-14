@@ -23,3 +23,5 @@ client/dist/
 
 # Vite/CRA cache (optional)
 client/.cache/
+
+server/fixtries/
