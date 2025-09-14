@@ -8,15 +8,14 @@ const createInset = async (req, res) => {
     console.log('Request body:', req.body);
     console.log('User from auth middleware:', req.userId, req.username);
 
-    // Extract data from request body
+    // Extract data from request body - skuId is required
     const { 
+      skuId, 
       baseSku, 
       size, 
       color, 
       pack, 
       category, 
-      name, 
-      orderNo, 
       bin, 
       quantity, 
       user 
@@ -24,18 +23,16 @@ const createInset = async (req, res) => {
 
     // Validation - Check all required fields
     const requiredFields = {
+      skuId: 'SKU ID',
       baseSku: 'Base SKU',
       size: 'Size',
       color: 'Color', 
       pack: 'Pack',
       category: 'Category',
-      name: 'Item Name',
-      orderNo: 'Order Number',
       bin: 'Bin Location',
       quantity: 'Quantity'
     };
 
-    // Check for missing fields
     for (const [field, label] of Object.entries(requiredFields)) {
       if (!req.body[field] || req.body[field] === '' || req.body[field] === 0) {
         console.log(`❌ Validation failed - ${label} is missing:`, req.body[field]);
@@ -47,7 +44,7 @@ const createInset = async (req, res) => {
       }
     }
 
-    // Additional quantity validation
+    // Quantity validation
     if (Number(quantity) <= 0) {
       console.log('❌ Validation failed - invalid quantity:', quantity);
       return res.status(400).json({ 
@@ -58,15 +55,14 @@ const createInset = async (req, res) => {
 
     console.log('✅ All validation passed');
 
-    // Create the inset document
+    // Create inset document
     const insetData = {
+      skuId: skuId.trim().toUpperCase(),
       baseSku: baseSku.trim().toUpperCase(),
       size: size.trim().toUpperCase(),
       color: color.trim().toUpperCase(),
       pack: pack.trim(),
       category: category.trim(),
-      name: name.trim(),
-      orderNo: orderNo.trim(),
       bin: bin.trim().toUpperCase(),
       quantity: Number(quantity),
       user: {
@@ -81,16 +77,16 @@ const createInset = async (req, res) => {
     const savedInset = await inset.save();
     
     console.log('✅ Inset saved successfully:', savedInset._id);
-    console.log('Generated SKU ID:', savedInset.skuId);
+    console.log('Manual SKU ID:', savedInset.skuId);
 
-    // Update inventory after inset is saved
+    // Update inventory
     try {
       console.log('📦 Updating inventory...');
       const inventoryItem = await Inventory.updateStock(
         savedInset.skuId,
         savedInset.quantity,
         savedInset.bin,
-        savedInset.name,
+        null, // name no longer used
         savedInset.baseSku,
         savedInset.size,
         savedInset.color,
@@ -100,7 +96,6 @@ const createInset = async (req, res) => {
       console.log('✅ Inventory updated:', inventoryItem.skuId);
     } catch (invError) {
       console.error('❌ Failed to update inventory:', invError.message);
-      // Continue - don't fail the inset creation if inventory update fails
     }
 
     console.log('=== INSET CREATION SUCCESS ===');
@@ -113,7 +108,6 @@ const createInset = async (req, res) => {
     console.error('=== INSET CREATION ERROR ===');
     console.error('Error details:', error);
 
-    // Handle mongoose validation errors
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ 
@@ -123,7 +117,6 @@ const createInset = async (req, res) => {
       });
     }
 
-    // Handle duplicate SKU error
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyPattern)[0];
       return res.status(400).json({ 
@@ -133,7 +126,6 @@ const createInset = async (req, res) => {
       });
     }
 
-    // Generic server error
     res.status(500).json({ 
       message: 'Server Error during inset creation',
       error: error.message,
@@ -148,8 +140,8 @@ const getInsets = async (req, res) => {
     console.log('=== FETCHING INSETS ===');
     
     const insets = await Inset.find()
-      .sort({ createdAt: -1 }) // Latest first
-      .lean(); // For better performance
+      .sort({ createdAt: -1 }) 
+      .lean();
     
     console.log(`✅ Found ${insets.length} insets`);
     

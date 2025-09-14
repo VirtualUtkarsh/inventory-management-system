@@ -11,11 +11,13 @@ const insetSchema = new mongoose.Schema({
     uppercase: true
   },
   
-  // Auto-generated SKU_ID in format: BASESKU-SIZE-COLOR-PACK
+  // CHANGED: Manual SKU_ID input field (no longer auto-generated)
   skuId: {
     type: String,
+    required: [true, 'SKU ID is required'],
     unique: true,
-    trim: true
+    trim: true,
+    uppercase: true
   },
   
   // Metadata fields
@@ -45,17 +47,9 @@ const insetSchema = new mongoose.Schema({
     trim: true
   },
   
-  // Original fields
-  name: {
-    type: String,
-    required: [true, 'Name is required'],
-    trim: true
-  },
-  orderNo: {
-    type: String,
-    required: true,
-    trim: true
-  },
+  // REMOVED: name field - no longer needed
+  // REMOVED: orderNo field - no longer needed
+  
   bin: {
     type: String,
     required: true,
@@ -79,18 +73,14 @@ const insetSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Pre-save middleware to generate SKU_ID
-insetSchema.pre('save', function(next) {
-  if (this.baseSku && this.size && this.color && this.pack) {
-    this.skuId = `${this.baseSku}-${this.size}-${this.color}-${this.pack}`;
-  }
-  next();
-});
+// REMOVED: Pre-save middleware for auto SKU generation
+// Users will now manually enter the complete SKU ID
 
 // Update inventory after inset is saved (uncomment if needed)
+// Note: Removed 'name' parameter since it no longer exists
 // insetSchema.post('save', async function (doc, next) {
 //   try {
-//     await Inventory.updateStock(doc.skuId, doc.quantity, doc.bin, doc.name);
+//     await Inventory.updateStock(doc.skuId, doc.quantity, doc.bin);
 //     console.log('✅ Inventory increased for SKU_ID:', doc.skuId);
 //     next();
 //   } catch (error) {

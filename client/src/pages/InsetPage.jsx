@@ -13,8 +13,8 @@ const InsetPage = () => {
     color: '',
     pack: '',
     category: '',
-    name: '',
-    orderNo: '',
+    // REMOVED: name: '',
+    // REMOVED: orderNo: '',
     bin: '',
     quantity: ''
   });
@@ -33,7 +33,7 @@ const InsetPage = () => {
   const [metadataLoading, setMetadataLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter states
+  // Filter states - REMOVED orderNo filter
   const [filters, setFilters] = useState({
     search: '',
     baseSku: '',
@@ -41,7 +41,7 @@ const InsetPage = () => {
     color: '',
     pack: '',
     category: '',
-    orderNo: '',
+    // REMOVED: orderNo: '',
     bin: '',
     userName: '',
     dateFrom: '',
@@ -111,17 +111,15 @@ const InsetPage = () => {
     fetchInsets();
   }, [fetchInsets]);
 
-  // Apply filters whenever filters or insets changes
+  // Apply filters whenever filters or insets changes - REMOVED name and orderNo filters
   useEffect(() => {
     let filtered = [...insets];
 
-    // Search filter (searches SKU ID, name, order number, and bin)
+    // Search filter (searches SKU ID and bin) - REMOVED name and orderNo from search
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(item => 
         (item.skuId || '').toLowerCase().includes(searchTerm) ||
-        (item.name || '').toLowerCase().includes(searchTerm) ||
-        (item.orderNo || '').toLowerCase().includes(searchTerm) ||
         (item.bin || '').toLowerCase().includes(searchTerm)
       );
     }
@@ -151,12 +149,7 @@ const InsetPage = () => {
       filtered = filtered.filter(item => item.category === filters.category);
     }
 
-    // Order number filter
-    if (filters.orderNo) {
-      filtered = filtered.filter(item => 
-        (item.orderNo || '').toLowerCase().includes(filters.orderNo.toLowerCase())
-      );
-    }
+    // REMOVED: Order number filter
 
     // Bin filter
     if (filters.bin) {
@@ -231,7 +224,7 @@ const InsetPage = () => {
       color: '',
       pack: '',
       category: '',
-      orderNo: '',
+      // REMOVED: orderNo: '',
       bin: '',
       userName: '',
       dateFrom: '',
@@ -261,9 +254,9 @@ const InsetPage = () => {
     if (error) setError(null);
   };
 
-  // Form validation function
+  // Form validation function - REMOVED name and orderNo validation
   const validateForm = () => {
-    const requiredFields = ['baseSku', 'size', 'color', 'pack', 'category', 'name', 'orderNo', 'bin', 'quantity'];
+    const requiredFields = ['baseSku', 'size', 'color', 'pack', 'category', 'bin', 'quantity'];
     
     for (let field of requiredFields) {
       if (!formData[field] || formData[field] === '' || formData[field] === 0) {
@@ -291,15 +284,15 @@ const InsetPage = () => {
     setLoading(true);
     setError(null);
 
-    // Prepare submission data with user info
+    // Prepare submission data with user info - REMOVED name and orderNo
     const submissionData = {
       baseSku: formData.baseSku.trim().toUpperCase(),
       size: formData.size.trim().toUpperCase(),
       color: formData.color.trim().toUpperCase(),
       pack: formData.pack.trim(),
       category: formData.category.trim(),
-      name: formData.name.trim(),
-      orderNo: formData.orderNo.trim(),
+      // REMOVED: name: formData.name.trim(),
+      // REMOVED: orderNo: formData.orderNo.trim(),
       bin: formData.bin.trim().toUpperCase(),
       quantity: Number(formData.quantity),
       user: {
@@ -313,15 +306,15 @@ const InsetPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Reset form
+      // Reset form - REMOVED name and orderNo
       setFormData({
         baseSku: '',
         size: '',
         color: '',
         pack: '',
         category: '',
-        name: '',
-        orderNo: '',
+        // REMOVED: name: '',
+        // REMOVED: orderNo: '',
         bin: '',
         quantity: ''
       });
@@ -344,8 +337,8 @@ const InsetPage = () => {
       color: '',
       pack: '',
       category: '',
-      name: '',
-      orderNo: '',
+      // REMOVED: name: '',
+      // REMOVED: orderNo: '',
       bin: '',
       quantity: ''
     });
@@ -353,19 +346,19 @@ const InsetPage = () => {
     setError(null);
   };
 
-  // Download CSV function
+  // Download CSV function - REMOVED Name and Order No columns
   const downloadCSV = () => {
     if (filteredInsets.length === 0) return;
 
     const headers = [
       'Generated SKU',
       'Base SKU', 
-      'Name',
+      // REMOVED: 'Name',
       'Size',
       'Color',
       'Pack',
       'Category',
-      'Order No',
+      // REMOVED: 'Order No',
       'Bin',
       'Quantity',
       'Added By',
@@ -375,12 +368,12 @@ const InsetPage = () => {
     const csvData = filteredInsets.map(item => [
       item.skuId || 'N/A',
       item.baseSku || '',
-      item.name || '',
+      // REMOVED: item.name || '',
       item.size || '',
       item.color || '',
       item.pack || '',
       item.category || '',
-      item.orderNo || '',
+      // REMOVED: item.orderNo || '',
       item.bin || '',
       item.quantity || 0,
       item.user?.name || 'System',
@@ -402,7 +395,7 @@ const InsetPage = () => {
     document.body.removeChild(link);
   };
 
-  // Print table function
+  // Print table function - REMOVED Name and Order No columns
   const printTable = () => {
     if (filteredInsets.length === 0) return;
 
@@ -430,12 +423,10 @@ const InsetPage = () => {
             <tr>
               <th>Generated SKU</th>
               <th>Base SKU</th>
-              <th>Name</th>
               <th>Size</th>
               <th>Color</th>
               <th>Pack</th>
               <th>Category</th>
-              <th>Order No</th>
               <th>Bin</th>
               <th>Quantity</th>
               <th>Added By</th>
@@ -447,12 +438,10 @@ const InsetPage = () => {
               <tr>
                 <td>${item.skuId || 'N/A'}</td>
                 <td>${item.baseSku || ''}</td>
-                <td>${item.name || ''}</td>
                 <td>${item.size || ''}</td>
                 <td>${item.color || ''}</td>
                 <td>${item.pack || ''}</td>
                 <td>${item.category || ''}</td>
-                <td>${item.orderNo || ''}</td>
                 <td>${item.bin || ''}</td>
                 <td>+${item.quantity || 0}</td>
                 <td>${item.user?.name || 'System'}</td>
@@ -477,15 +466,6 @@ const InsetPage = () => {
 
   // Calculate metrics
   const totalInbound = insets.length;
-  // const todayCount = insets.filter(item => {
-  //   const today = new Date();
-  //   const itemDate = new Date(item.createdAt);
-  //   return itemDate.toDateString() === today.toDateString();
-  // }).length;
-  // const totalQuantity = insets.reduce((sum, item) => sum + (item.quantity || 0), 0);
-  // const uniqueOrders = new Set(insets.map(item => item.orderNo).filter(Boolean)).size;
-  // const uniqueBins = new Set(insets.map(item => item.bin).filter(Boolean)).size;
-  // const uniqueBaseSKUs = new Set(insets.map(item => item.baseSku).filter(Boolean)).size;
 
   if (metadataLoading) {
     return <div className="p-4 text-lg">Loading metadata...</div>;
@@ -500,40 +480,7 @@ const InsetPage = () => {
           <p className="text-gray-600">Track and manage incoming inventory items</p>
         </div>
 
-        {/* Summary Cards */}
-        {/* <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          <div className="bg-blue-100 text-blue-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Total Records</h4>
-            <p className="text-2xl font-bold">{totalInbound}</p>
-          </div>
-          
-          <div className="bg-green-100 text-green-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Total Qty</h4>
-            <p className="text-2xl font-bold">{totalQuantity}</p>
-          </div>
-          
-          <div className="bg-yellow-100 text-yellow-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Today</h4>
-            <p className="text-2xl font-bold">{todayCount}</p>
-          </div>
-          
-          <div className="bg-purple-100 text-purple-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Base SKUs</h4>
-            <p className="text-2xl font-bold">{uniqueBaseSKUs}</p>
-          </div>
-          
-          <div className="bg-indigo-100 text-indigo-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Orders</h4>
-            <p className="text-2xl font-bold">{uniqueOrders}</p>
-          </div>
-          
-          <div className="bg-red-100 text-red-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Bins Used</h4>
-            <p className="text-2xl font-bold">{uniqueBins}</p>
-          </div>
-        </div> */}
-
-        {/* Filters Section */}
+        {/* Filters Section - REMOVED Order Number filter */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
@@ -546,7 +493,7 @@ const InsetPage = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Search */}
+            {/* Search - Updated placeholder text */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
               <input
@@ -554,7 +501,7 @@ const InsetPage = () => {
                 name="search"
                 value={filters.search}
                 onChange={handleFilterChange}
-                placeholder="SKU, Name, Order, Bin..."
+                placeholder="SKU, Bin..."
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -607,18 +554,7 @@ const InsetPage = () => {
               </select>
             </div>
 
-            {/* Order No Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Order Number</label>
-              <input
-                type="text"
-                name="orderNo"
-                value={filters.orderNo}
-                onChange={handleFilterChange}
-                placeholder="Search order..."
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            {/* REMOVED: Order No Filter */}
 
             {/* Bin Filter */}
             <div>
@@ -668,7 +604,7 @@ const InsetPage = () => {
                   name="recentOnly"
                   checked={filters.recentOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Last 7 Days</span>
               </label>
@@ -679,7 +615,7 @@ const InsetPage = () => {
                   name="todayOnly"
                   checked={filters.todayOnly}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Today Only</span>
               </label>
@@ -827,7 +763,7 @@ const InsetPage = () => {
                 )}
               </div>
 
-              {/* Additional Details */}
+              {/* Additional Details - REMOVED name and orderNo fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {/* Category */}
                 <div>
@@ -848,33 +784,8 @@ const InsetPage = () => {
                   </select>
                 </div>
 
-                {/* Item Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="e.g. Cotton T-Shirt"
-                    required
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Order Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Order Number *</label>
-                  <input
-                    type="text"
-                    name="orderNo"
-                    value={formData.orderNo}
-                    onChange={handleChange}
-                    placeholder="e.g. ORD-2024-001"
-                    required
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                {/* REMOVED: Item Name field */}
+                {/* REMOVED: Order Number field */}
 
                 {/* Bin Location */}
                 <div>
@@ -891,7 +802,7 @@ const InsetPage = () => {
                 </div>
 
                 {/* Quantity */}
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
                   <input
                     type="number"
@@ -925,10 +836,8 @@ const InsetPage = () => {
             </form>
           )}
 
-          {/* Inbound History Table */}
-          {/* <div className="overflow-x-auto mt-6"> */}
+          {/* Inbound History Table - REMOVED Name and Order No columns */}
           <div className="overflow-x-auto mt-6 w-full">
-
             {loading && insets.length === 0 ? (
               <div className="text-center py-8 text-gray-600">Loading inbound records...</div>
             ) : filteredInsets.length === 0 ? (
@@ -944,9 +853,9 @@ const InsetPage = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Generated SKU</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base SKU</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    {/* REMOVED: Name column */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order No</th>
+                    {/* REMOVED: Order No column */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bin</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added By</th>
@@ -960,7 +869,7 @@ const InsetPage = () => {
                         {inset.skuId || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{inset.baseSku}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{inset.name}</td>
+                      {/* REMOVED: Name column */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="flex flex-wrap gap-1">
                           {inset.size && <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{inset.size}</span>}
@@ -969,7 +878,7 @@ const InsetPage = () => {
                           {inset.category && <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">{inset.category}</span>}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{inset.orderNo}</td>
+                      {/* REMOVED: Order No column */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{inset.bin}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">+{inset.quantity}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{inset.user?.name || 'System'}</td>
