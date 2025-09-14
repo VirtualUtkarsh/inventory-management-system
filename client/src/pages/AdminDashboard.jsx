@@ -137,14 +137,14 @@ const AdminDashboard = () => {
     }
   };
 
-  const setCurrentMetadata = (data) => {
-    switch (activeMetadataTab) {
-      case 'sizes': setSizes(data); break;
-      case 'colors': setColors(data); break;
-      case 'packs': setPacks(data); break;
-      case 'categories': setCategories(data); break;
-    }
-  };
+  // const setCurrentMetadata = (data) => {
+  //   switch (activeMetadataTab) {
+  //     case 'sizes': setSizes(data); break;
+  //     case 'colors': setColors(data); break;
+  //     case 'packs': setPacks(data); break;
+  //     case 'categories': setCategories(data); break;
+  //   }
+  // };
 
   const handleAddMetadata = () => {
     setModalType('add');
@@ -168,43 +168,43 @@ const AdminDashboard = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      const currentData = getCurrentMetadata();
-      setCurrentMetadata(currentData.filter(item => item._id !== id));
+      // const currentData = getCurrentMetadata();
+      // setCurrentMetadata(currentData.filter(item => item._id !== id));
       console.log('Delete successful');
     } catch (err) {
       console.error('Delete failed:', err);
     }
   };
 
-  const handleSubmitMetadata = async (e) => {
-    e.preventDefault();
+  // const handleSubmitMetadata = async (e) => {
+  //   e.preventDefault();
     
-    try {
-      if (modalType === 'add') {
-        const response = await axiosInstance.post(`/api/metadata/${activeMetadataTab}`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+    // try {
+    //   if (modalType === 'add') {
+    //     const response = await axiosInstance.post(`/api/metadata/${activeMetadataTab}`, formData, {
+    //       headers: { Authorization: `Bearer ${token}` }
+    //     });
         
-        const currentData = getCurrentMetadata();
-        setCurrentMetadata([...currentData, response.data]);
-      } else {
-        const response = await axiosInstance.put(`/api/metadata/${activeMetadataTab}/${editingItem._id}`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+    //     const currentData = getCurrentMetadata();
+      //   setCurrentMetadata([...currentData, response.data]);
+      // } else {
+      //   const response = await axiosInstance.put(`/api/metadata/${activeMetadataTab}/${editingItem._id}`, formData, {
+      //     headers: { Authorization: `Bearer ${token}` }
+      //   });
         
-        const currentData = getCurrentMetadata();
-        setCurrentMetadata(currentData.map(item => 
-          item._id === editingItem._id ? response.data : item
-        ));
-      }
+      //   const currentData = getCurrentMetadata();
+      //   setCurrentMetadata(currentData.map(item => 
+      //     item._id === editingItem._id ? response.data : item
+      //   ));
+  //     }
       
-      setIsModalOpen(false);
-      setFormData({ name: '' });
-      console.log(`${modalType} successful`);
-    } catch (err) {
-      console.error(`${modalType} failed:`, err);
-    }
-  };
+  //     setIsModalOpen(false);
+  //     setFormData({ name: '' });
+  //     console.log(`${modalType} successful`);
+  //   } catch (err) {
+  //     console.error(`${modalType} failed:`, err);
+  //   }
+  // };
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -232,7 +232,7 @@ const AdminDashboard = () => {
             >
               User Management
             </button>
-            <button
+            {/* <button
               onClick={() => setActiveTab('metadata')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'metadata'
@@ -241,7 +241,7 @@ const AdminDashboard = () => {
               }`}
             >
               Metadata Manager
-            </button>
+            </button> */}
           </nav>
         </div>
       </div>
@@ -421,7 +421,7 @@ const AdminDashboard = () => {
               {modalType === 'add' ? 'Add' : 'Edit'} {activeMetadataTab.slice(0, -1)}
             </h3>
             
-            <form onSubmit={handleSubmitMetadata}>
+            <form onSubmit={handleEditMetadata}>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Name
