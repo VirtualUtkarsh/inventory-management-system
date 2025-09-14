@@ -58,8 +58,7 @@ These commands will push you code to new branch: feature/<your-feature-name>
 git add .
 git commit -m "Complete: <feature-name> ✅"
 git checkout -b v3plusadmin    # Create and switch to new branch
-git push -u origin feature/<your-feature-name>
-```
+git push -u origin v3plusadmin``` #you can replace v3plusadmin with your desired branch name 
 
 ### 5. Then, go to GitHub and **create a Pull Request from your feature branch to `dev`**.
 Then your pull request code will be reviewed and then merged if approved by at least one of the team members
@@ -78,6 +77,7 @@ Then your pull request code will be reviewed and then merged if approved by at l
 Checkout the resources and documentations: https://chatgpt.com/share/68c2923c-ca64-800c-ac0f-3fb06fd39d76
 
 ![image](https://github.com/user-attachments/assets/ab9d3919-69de-4177-af33-40f453d9e005)
+
 
 
 
