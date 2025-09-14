@@ -337,18 +337,18 @@ const InventoryPage = () => {
                   name="lowStock"
                   checked={filters.lowStock}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Low Stock (&lt; 10)</span>
               </label>
 
-              <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer">
+              <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer  ">
                 <input
                   type="checkbox"
                   name="outOfStock"
                   checked={filters.outOfStock}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Out of Stock</span>
               </label>

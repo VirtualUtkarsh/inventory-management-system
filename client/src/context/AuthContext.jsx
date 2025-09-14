@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import axios from 'axios';
+import axiosInstance from '../utils/axiosInstance'; // Import our custom axios instance
 import jwt_decode from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,11 +11,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
   const login = async (email, password) => {
     try {
-      const { data } = await axios.post('/api/auth/login', { email, password });
+      console.log('🔐 Attempting login with axiosInstance...');
+      const { data } = await axiosInstance.post('/api/auth/login', { email, password });
       localStorage.setItem('token', data.token);
       setToken(data.token);
       setUser(data.user);
@@ -36,7 +35,8 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (name, email, password) => {
     try {
-      const { data } = await axios.post('/api/auth/register', { name, email, password });
+      console.log('📝 Attempting register with axiosInstance...');
+      const { data } = await axiosInstance.post('/api/auth/register', { name, email, password });
       localStorage.setItem('token', data.token);
       setToken(data.token);
       setUser(data.user);
@@ -72,13 +72,13 @@ export const AuthProvider = ({ children }) => {
         if (decoded.exp * 1000 < Date.now()) {
           logout();
         } else {
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
+          // Set token for axiosInstance (this is handled by the interceptor)
+          
           // Always try to fetch user data if we don't have it
           if (!user) {
             console.log('🔍 Fetching user from /api/auth/me');
             try {
-              const res = await axios.get('/api/auth/me');
+              const res = await axiosInstance.get('/api/auth/me');
               console.log('🔍 /api/auth/me response:', res.data);
               setUser(res.data.user);
             } catch (error) {
