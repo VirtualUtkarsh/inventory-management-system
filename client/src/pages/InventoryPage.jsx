@@ -30,11 +30,11 @@ const InventoryPage = () => {
   });
 
   // Metadata for filters
-  const [metadata, setMetadata] = useState({
-    sizes: [],
-    categories: [],
-    baseSKUs: []
-  });
+  // const [metadata, setMetadata] = useState({
+  //   sizes: [],
+  //   categories: [],
+  //   baseSKUs: []
+  // });
 
   // Cleanup function for component unmount
   useEffect(() => {
@@ -196,16 +196,16 @@ const InventoryPage = () => {
       setFilteredInventory(data);
       
       // Extract unique values for filters
-      const uniqueBaseSKUs = [...new Set(data.map(item => item.baseSku).filter(Boolean))];
-      const uniqueSizes = [...new Set(data.map(item => item.size).filter(Boolean))];
+      // const uniqueBaseSKUs = [...new Set(data.map(item => item.baseSku).filter(Boolean))];
+      // const uniqueSizes = [...new Set(data.map(item => item.size).filter(Boolean))];
       // const uniqueCategories = [...new Set(data.map(item => item.category).filter(Boolean))];
       
-      setMetadata(prev => ({
-        ...prev,
-        baseSKUs: uniqueBaseSKUs.sort(),
-        sizes: uniqueSizes.sort(),
-        // categories: uniqueCategories.sort()
-      }));
+      // setMetadata(prev => ({
+      //   ...prev,
+      //   baseSKUs: uniqueBaseSKUs.sort(),
+      //   sizes: uniqueSizes.sort(),
+      //   // categories: uniqueCategories.sort()
+      // }));
       
     } catch (err) {
       // Don't show error if request was aborted (race condition handling)

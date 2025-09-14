@@ -232,7 +232,7 @@ const AdminDashboard = () => {
             >
               User Management
             </button>
-            {/* <button
+            <button
               onClick={() => setActiveTab('metadata')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'metadata'
@@ -241,7 +241,7 @@ const AdminDashboard = () => {
               }`}
             >
               Metadata Manager
-            </button> */}
+            </button>
           </nav>
         </div>
       </div>
