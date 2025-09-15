@@ -1,34 +1,34 @@
 // client/src/utils/axiosInstance.js
 import axios from 'axios';
 
-// Determine the API base URL based on environment
+// 🔧 Determine API base URL
 const getApiBaseUrl = () => {
-  // First check if environment variable is set
+  // Priority 1: Environment variable
   if (process.env.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
-  
-  // Auto-detect based on current hostname
+
+  // Priority 2: DevTunnels (when running frontend on tunnel)
   const hostname = window.location.hostname;
-  
   if (hostname.includes('devtunnels.ms')) {
-    // Running on tunnel - extract tunnel ID and use backend tunnel URL
-    const tunnelId = hostname.split('-')[0]; // Gets 'hr1jqkkg' from 'hr1jqkkg-3000.inc1.devtunnels.ms'
+    const tunnelId = hostname.split('-')[0]; 
     return `https://${tunnelId}-5000.inc1.devtunnels.ms/`;
   }
-  
-  // Local development fallback
-  return 'http://localhost:5000/';
+
+  // Priority 3: Local development fallback
+  return 'http://localhost:5000';
 };
 
 const baseURL = getApiBaseUrl();
-console.log('🔧 Axios Base URL:', baseURL); // Debug log
+console.log('🔧 Axios Base URL:', baseURL);
 
+// ✅ Create axios instance
 const axiosInstance = axios.create({
-  baseURL: baseURL,
+  baseURL,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true, // include cookies if needed
 });
 
 // 🔐 Attach token before every request
@@ -38,37 +38,42 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Debug logging for tunnel requests
+
+    // Debug log for tunnels
     if (window.location.hostname.includes('devtunnels.ms')) {
-      console.log('🌐 API Request:', config.method?.toUpperCase(), config.baseURL + config.url);
+      console.log(
+        '🌐 API Request:',
+        config.method?.toUpperCase(),
+        config.baseURL + config.url
+      );
     }
-    
+
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ⚠️ Global error handler (e.g., auth failure)
+// ⚠️ Global error handler
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error);
-    
-    // Additional debugging for tunnel requests
+
+    // Extra tunnel debugging
     if (window.location.hostname.includes('devtunnels.ms')) {
       console.error('🌐 Tunnel API Error:', {
         url: error.config?.url,
         baseURL: error.config?.baseURL,
         method: error.config?.method,
         status: error.response?.status,
-        message: error.response?.data?.message || error.message
+        message: error.response?.data?.message || error.message,
       });
     }
 
+    // Handle expired/invalid token
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login'; // Force logout
+      window.location.href = '/login';
     }
 
     return Promise.reject(error);
