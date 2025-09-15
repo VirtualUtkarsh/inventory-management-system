@@ -26,7 +26,8 @@ const corsOptions = {
     'http://localhost:3000',
     'https://hr1jqkkg-3000.inc1.devtunnels.ms',
     /\.devtunnels\.ms$/,
-    'https://inventory-frontend.vercel.app' // ✅ add your Vercel frontend URL
+    'https://inventory-frontend.vercel.app',
+    'https://inventoryyy-3xwmu6i43-utkarsh-singhs-projects-ab9afad9.vercel.app' // ✅ Your deployed frontend URL
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [
@@ -39,6 +40,9 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Preflight requests
+
+// ✅ ADD THESE MISSING MIDDLEWARE LINES:
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(morgan('dev'));
