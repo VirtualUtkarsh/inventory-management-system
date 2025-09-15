@@ -24,10 +24,8 @@ const app = express();
 const corsOptions = {
   origin: [
     'http://localhost:3000',
-    'https://hr1jqkkg-3000.inc1.devtunnels.ms',
     /\.devtunnels\.ms$/,
-    'https://inventory-frontend.vercel.app',
-    'https://inventoryyy-3xwmu6i43-utkarsh-singhs-projects-ab9afad9.vercel.app' // ✅ Your deployed frontend URL
+    /.*\.vercel\.app$/, // ✅ This will match ANY Vercel app URL - future-proof!
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [
@@ -42,7 +40,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // Preflight requests
 
-// ✅ ADD THESE MISSING MIDDLEWARE LINES:
+// ✅ Essential middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(morgan('dev'));
