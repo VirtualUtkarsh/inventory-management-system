@@ -3,6 +3,7 @@ const ProductSize = require('../models/ProductSize');
 const Color = require('../models/Color');
 const Pack = require('../models/Pack');
 const ProductCategory = require('../models/ProductCategory');
+const Bin = require('../models/Bin');
 
 // Generic CRUD functions for all metadata types
 const createMetadataController = (Model, name) => ({
@@ -78,6 +79,7 @@ const sizeController = createMetadataController(ProductSize, 'Size');
 const colorController = createMetadataController(Color, 'Color');
 const packController = createMetadataController(Pack, 'Pack');
 const categoryController = createMetadataController(ProductCategory, 'Category');
+const binController = createMetadataController(Bin, 'Bin');
 
 // Initialize default data
 const initializeDefaultData = async (userId) => {
@@ -122,6 +124,16 @@ const initializeDefaultData = async (userId) => {
       );
     }
 
+    // Default bins
+    const defaultBins = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'Storage-01', 'Storage-02'];
+    for (const bin of defaultBins) {
+      await Bin.findOneAndUpdate(
+        { name: bin },
+        { name: bin, createdBy: userId, isActive: true },
+        { upsert: true, new: true }
+      );
+    }
+
     console.log('✅ Default metadata initialized');
   } catch (error) {
     console.error('❌ Error initializing default metadata:', error);
@@ -131,18 +143,20 @@ const initializeDefaultData = async (userId) => {
 // Get all metadata for forms (combined endpoint)
 const getAllMetadata = async (req, res) => {
   try {
-    const [sizes, colors, packs, categories] = await Promise.all([
+    const [sizes, colors, packs, categories, bins] = await Promise.all([
       ProductSize.find({ isActive: true }).sort({ name: 1 }),
       Color.find({ isActive: true }).sort({ name: 1 }),
       Pack.find({ isActive: true }).sort({ name: 1 }),
-      ProductCategory.find({ isActive: true }).sort({ name: 1 })
+      ProductCategory.find({ isActive: true }).sort({ name: 1 }),
+      Bin.find({ isActive: true }).sort({ name: 1 })
     ]);
 
     res.json({
       sizes: sizes.map(s => s.name),
       colors: colors.map(c => c.name),
       packs: packs.map(p => p.name),
-      categories: categories.map(cat => cat.name)
+      categories: categories.map(cat => cat.name),
+      bins: bins.map(b => b.name)
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch metadata', error: error.message });
@@ -154,6 +168,7 @@ module.exports = {
   colors: colorController,
   packs: packController,
   categories: categoryController,
+  bins: binController,
   initializeDefaultData,
   getAllMetadata
 };

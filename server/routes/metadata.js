@@ -34,4 +34,10 @@ router.post('/categories', metadataController.categories.create);
 router.put('/categories/:id', metadataController.categories.update);
 router.delete('/categories/:id', metadataController.categories.delete);
 
+// Bins - NEW
+router.get('/bins', metadataController.bins.getAll);
+router.post('/bins', metadataController.bins.create);
+router.put('/bins/:id', metadataController.bins.update);
+router.delete('/bins/:id', metadataController.bins.delete);
+
 module.exports = router;

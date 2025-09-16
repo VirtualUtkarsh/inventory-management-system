@@ -18,7 +18,7 @@ export default function OutsetPage() {
   const [loading, setLoading] = useState({ inventory: true, outsets: true });
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Simplified filter states - removed size, color, pack, category, baseSku
+  // Simplified filter states
   const [filters, setFilters] = useState({
     search: '',
     skuId: '',
@@ -57,7 +57,7 @@ export default function OutsetPage() {
     fetchData();
   }, [fetchData]);
 
-  // Simplified filters - removed baseSku, size, color, pack, category filters
+  // Simplified filters
   useEffect(() => {
     let filtered = [...outsetItems];
 
@@ -233,6 +233,25 @@ export default function OutsetPage() {
     return item.skuId || item.sku || 'N/A';
   };
 
+  // Get unique bins from filtered outsets for filter dropdown
+  const getUniqueBins = () => {
+    const uniqueBins = [...new Set(outsetItems.map(item => item.bin).filter(Boolean))];
+    return uniqueBins.sort();
+  };
+
+  // Group inventory by SKU to show multiple bins for same SKU
+  const getGroupedInventory = () => {
+    const grouped = {};
+    inventory.forEach(item => {
+      const sku = getDisplaySku(item);
+      if (!grouped[sku]) {
+        grouped[sku] = [];
+      }
+      grouped[sku].push(item);
+    });
+    return grouped;
+  };
+
   // Simplified CSV Download function
   const downloadCSV = () => {
     if (filteredOutsets.length === 0) return;
@@ -388,20 +407,22 @@ export default function OutsetPage() {
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            {/* Bin Filter */}
+            
+            {/* Bin Filter - Now using dropdown */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Bin Location</label>
-              <input
-                type="text"
+              <select
                 name="bin"
                 value={filters.bin}
                 onChange={handleFilterChange}
-                placeholder="Filter by bin..."
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="">All Bins</option>
+                {getUniqueBins().map(bin => (
+                  <option key={bin} value={bin}>{bin}</option>
+                ))}
+              </select>
             </div>
-
-
 
             {/* User Name Filter */}
             <div>
@@ -439,6 +460,7 @@ export default function OutsetPage() {
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            
             {/* Customer Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
@@ -596,12 +618,12 @@ export default function OutsetPage() {
           )}
         </div>
 
-        {/* Mobile-Optimized Product Selection Modal */}
+        {/* Enhanced Product Selection Modal - Now shows items grouped by SKU with bin info */}
         {showProductModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg w-full max-w-md max-h-[80vh] flex flex-col">
+            <div className="bg-white rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col">
               <div className="p-6 border-b">
-                <h2 className="text-lg font-semibold mb-4">Select Product</h2>
+                <h2 className="text-lg font-semibold mb-4">Select Product & Bin</h2>
                 <div className="relative">
                   <input
                     type="text"
@@ -619,16 +641,15 @@ export default function OutsetPage() {
               </div>
               <div className="flex-1 overflow-y-auto p-6">
                 {(() => {
-                  const filteredInventory = inventory.filter(product => {
+                  const groupedInventory = getGroupedInventory();
+                  const filteredKeys = Object.keys(groupedInventory).filter(sku => {
                     if (!searchTerm.trim()) return true;
                     const search = searchTerm.toLowerCase();
-                    const sku = getDisplaySku(product).toLowerCase();
-                    const bin = product.bin.toLowerCase();
-                    
-                    return sku.includes(search) || bin.includes(search);
+                    return sku.toLowerCase().includes(search) || 
+                           groupedInventory[sku].some(item => item.bin.toLowerCase().includes(search));
                   });
 
-                  if (filteredInventory.length === 0) {
+                  if (filteredKeys.length === 0) {
                     return (
                       <div className="text-center text-gray-500 py-8">
                         {searchTerm.trim() ? 'No products found matching your search.' : 'No products available.'}
@@ -636,17 +657,33 @@ export default function OutsetPage() {
                     );
                   }
 
-                  return filteredInventory.map(product => (
-                    <div
-                      key={product._id}
-                      onClick={() => handleProductSelect(product)}
-                      className="border p-3 rounded-lg mb-2 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 touch-manipulation"
-                    >
-                      <div className="text-sm text-gray-600 mb-1">
-                        SKU: <span className="font-mono">{getDisplaySku(product)}</span>
+                  return filteredKeys.map(sku => (
+                    <div key={sku} className="mb-4">
+                      <div className="text-sm font-semibold text-gray-800 mb-2 bg-gray-100 p-2 rounded">
+                        SKU: {sku}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Qty: {product.quantity} | Bin: {product.bin}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+                        {groupedInventory[sku].map(product => (
+                          <div
+                            key={product._id}
+                            onClick={() => handleProductSelect(product)}
+                            className="border border-gray-200 p-3 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 touch-manipulation"
+                          >
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className="text-sm font-medium text-gray-700">
+                                  Bin: <span className="font-mono text-blue-600">{product.bin}</span>
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  Available: <span className="font-semibold text-green-600">{product.quantity}</span>
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                Click to select
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ));
@@ -667,17 +704,20 @@ export default function OutsetPage() {
           </div>
         )}
 
-        {/* Mobile-Optimized Outbound Confirmation Modal */}
+        {/* Enhanced Outbound Confirmation Modal - Shows selected bin clearly */}
         {showOutsetModal && selectedProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg w-full max-w-md space-y-4 p-6">
               <h2 className="text-lg font-semibold">Confirm Outbound</h2>
-              <div className="bg-gray-100 p-3 rounded">
-                <p className="text-sm text-gray-600 font-mono">
-                  SKU: {getDisplaySku(selectedProduct)}
+              <div className="bg-gray-100 p-4 rounded space-y-2">
+                <p className="text-sm text-gray-600">
+                  <span className="font-semibold">SKU:</span> <span className="font-mono">{getDisplaySku(selectedProduct)}</span>
                 </p>
                 <p className="text-sm text-gray-600">
-                  Bin: {selectedProduct.bin}
+                  <span className="font-semibold">From Bin:</span> <span className="font-mono text-blue-600">{selectedProduct.bin}</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  <span className="font-semibold">Available:</span> <span className="font-semibold text-green-600">{selectedProduct.quantity}</span>
                 </p>
               </div>
               <input

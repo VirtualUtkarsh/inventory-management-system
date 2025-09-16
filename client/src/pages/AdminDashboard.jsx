@@ -11,19 +11,15 @@ const AdminDashboard = () => {
   const [approvedUsers, setApprovedUsers] = useState([]);
   const [userLoading, setUserLoading] = useState(true);
   
-  // Metadata State
-  const [sizes, setSizes] = useState([]);
-  const [colors, setColors] = useState([]);
-  const [packs, setPacks] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [metadataLoading, setMetadataLoading] = useState(true);
+  // Bins State
+  const [bins, setBins] = useState([]);
+  const [binsLoading, setBinsLoading] = useState(true);
   
   // UI State
   const [activeTab, setActiveTab] = useState('users');
-  const [activeMetadataTab, setActiveMetadataTab] = useState('sizes');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('add'); // 'add' or 'edit'
-  const [editingItem, setEditingItem] = useState(null);
+  const [editingBin, setEditingBin] = useState(null);
   const [formData, setFormData] = useState({ name: '' });
 
   // Fetch Users
@@ -50,40 +46,26 @@ const AdminDashboard = () => {
     fetchUsers();
   }, [token]);
 
-  // Fetch Metadata
+  // Fetch Bins
   useEffect(() => {
-    const fetchMetadata = async () => {
+    const fetchBins = async () => {
       try {
-        const [sizesRes, colorsRes, packsRes, categoriesRes] = await Promise.all([
-          axiosInstance.get('/api/metadata/sizes', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axiosInstance.get('/api/metadata/colors', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axiosInstance.get('/api/metadata/packs', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axiosInstance.get('/api/metadata/categories', {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-        ]);
+        const response = await axiosInstance.get('/api/metadata/bins', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         
-        setSizes(sizesRes.data);
-        setColors(colorsRes.data);
-        setPacks(packsRes.data);
-        setCategories(categoriesRes.data);
+        setBins(response.data);
       } catch (err) {
-        console.error('Error fetching metadata:', err);
-        // If metadata routes not found, show helpful message
+        console.error('Error fetching bins:', err);
+        // If bins route not found, show helpful message
         if (err.response?.status === 404) {
-          console.log('Metadata routes not found. Make sure you added metadata routes to server.js');
+          console.log('Bins routes not found. Make sure you added bins routes to server.js');
         }
       } finally {
-        setMetadataLoading(false);
+        setBinsLoading(false);
       }
     };
-    fetchMetadata();
+    fetchBins();
   }, [token]);
 
   // User Management Functions
@@ -126,93 +108,75 @@ const AdminDashboard = () => {
     }
   };
 
-  // Metadata Management Functions
-  const getCurrentMetadata = () => {
-    switch (activeMetadataTab) {
-      case 'sizes': return sizes;
-      case 'colors': return colors;
-      case 'packs': return packs;
-      case 'categories': return categories;
-      default: return [];
-    }
-  };
-
-  // const setCurrentMetadata = (data) => {
-  //   switch (activeMetadataTab) {
-  //     case 'sizes': setSizes(data); break;
-  //     case 'colors': setColors(data); break;
-  //     case 'packs': setPacks(data); break;
-  //     case 'categories': setCategories(data); break;
-  //   }
-  // };
-
-  const handleAddMetadata = () => {
+  // Bins Management Functions
+  const handleAddBin = () => {
     setModalType('add');
     setFormData({ name: '' });
-    setEditingItem(null);
+    setEditingBin(null);
     setIsModalOpen(true);
   };
 
-  const handleEditMetadata = (item) => {
+  const handleEditBin = (bin) => {
     setModalType('edit');
-    setFormData({ name: item.name });
-    setEditingItem(item);
+    setFormData({ name: bin.name });
+    setEditingBin(bin);
     setIsModalOpen(true);
   };
 
-  const handleDeleteMetadata = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
+  const handleDeleteBin = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this bin?')) return;
     
     try {
-      await axiosInstance.delete(`/api/metadata/${activeMetadataTab}/${id}`, {
+      await axiosInstance.delete(`/api/metadata/bins/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // const currentData = getCurrentMetadata();
-      // setCurrentMetadata(currentData.filter(item => item._id !== id));
-      console.log('Delete successful');
+      setBins(bins.filter(bin => bin._id !== id));
+      console.log('Bin delete successful');
     } catch (err) {
-      console.error('Delete failed:', err);
+      console.error('Bin delete failed:', err);
+      // You might want to show an error message to the user here
+      alert('Failed to delete bin. It might be in use by existing inventory items.');
     }
   };
 
-  // const handleSubmitMetadata = async (e) => {
-  //   e.preventDefault();
+  const handleSubmitBin = async (e) => {
+    e.preventDefault();
     
-    // try {
-    //   if (modalType === 'add') {
-    //     const response = await axiosInstance.post(`/api/metadata/${activeMetadataTab}`, formData, {
-    //       headers: { Authorization: `Bearer ${token}` }
-    //     });
+    try {
+      if (modalType === 'add') {
+        const response = await axiosInstance.post('/api/metadata/bins', formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         
-    //     const currentData = getCurrentMetadata();
-      //   setCurrentMetadata([...currentData, response.data]);
-      // } else {
-      //   const response = await axiosInstance.put(`/api/metadata/${activeMetadataTab}/${editingItem._id}`, formData, {
-      //     headers: { Authorization: `Bearer ${token}` }
-      //   });
+        setBins([...bins, response.data]);
+      } else {
+        const response = await axiosInstance.put(`/api/metadata/bins/${editingBin._id}`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         
-      //   const currentData = getCurrentMetadata();
-      //   setCurrentMetadata(currentData.map(item => 
-      //     item._id === editingItem._id ? response.data : item
-      //   ));
-  //     }
+        setBins(bins.map(bin => 
+          bin._id === editingBin._id ? response.data : bin
+        ));
+      }
       
-  //     setIsModalOpen(false);
-  //     setFormData({ name: '' });
-  //     console.log(`${modalType} successful`);
-  //   } catch (err) {
-  //     console.error(`${modalType} failed:`, err);
-  //   }
-  // };
+      setIsModalOpen(false);
+      setFormData({ name: '' });
+      console.log(`Bin ${modalType} successful`);
+    } catch (err) {
+      console.error(`Bin ${modalType} failed:`, err);
+      // You might want to show an error message to the user here
+      alert(`Failed to ${modalType} bin. Please try again.`);
+    }
+  };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setFormData({ name: '' });
-    setEditingItem(null);
+    setEditingBin(null);
   };
 
-  if (userLoading && metadataLoading) {
+  if (userLoading && binsLoading) {
     return <div className="p-4 text-lg">Loading...</div>;
   }
 
@@ -232,16 +196,16 @@ const AdminDashboard = () => {
             >
               User Management
             </button>
-            {/* <button
-              onClick={() => setActiveTab('metadata')}
+            <button
+              onClick={() => setActiveTab('bins')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'metadata'
+                activeTab === 'bins'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Metadata Manager
-            </button> */}
+              Bins Manager
+            </button>
           </nav>
         </div>
       </div>
@@ -335,64 +299,43 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Metadata Tab Content */}
-      {activeTab === 'metadata' && (
+      {/* Bins Tab Content */}
+      {activeTab === 'bins' && (
         <div>
-          {/* Metadata Sub-tabs */}
-          <div className="mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8">
-                {['sizes', 'colors', 'packs', 'categories'].map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveMetadataTab(tab)}
-                    className={`py-2 px-1 border-b-2 font-medium text-sm capitalize ${
-                      activeMetadataTab === tab
-                        ? 'border-purple-500 text-purple-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </nav>
-            </div>
-          </div>
-
-          {/* Metadata Content */}
+          {/* Bins Content */}
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold capitalize">{activeMetadataTab} Management</h2>
+              <h2 className="text-xl font-semibold">Bins Management</h2>
               <button
-                onClick={handleAddMetadata}
+                onClick={handleAddBin}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
               >
-                Add {activeMetadataTab.slice(0, -1)}
+                Add Bin
               </button>
             </div>
 
-            {metadataLoading ? (
+            {binsLoading ? (
               <p className="text-gray-600">Loading...</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {getCurrentMetadata().map(item => (
-                  <div key={item._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                {bins.map(bin => (
+                  <div key={bin._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-medium text-gray-900">{item.name}</h3>
+                        <h3 className="font-medium text-gray-900">{bin.name}</h3>
                         <p className="text-sm text-gray-500">
-                          Created: {new Date(item.createdAt).toLocaleDateString()}
+                          Created: {new Date(bin.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => handleEditMetadata(item)}
+                          onClick={() => handleEditBin(bin)}
                           className="text-blue-600 hover:text-blue-800 text-sm"
                         >
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDeleteMetadata(item._id)}
+                          onClick={() => handleDeleteBin(bin._id)}
                           className="text-red-600 hover:text-red-800 text-sm"
                         >
                           Delete
@@ -404,9 +347,9 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {getCurrentMetadata().length === 0 && !metadataLoading && (
+            {bins.length === 0 && !binsLoading && (
               <p className="text-gray-600 text-center py-8">
-                No {activeMetadataTab} found. Add your first {activeMetadataTab.slice(0, -1)}!
+                No bins found. Add your first bin!
               </p>
             )}
           </div>
@@ -418,13 +361,13 @@ const AdminDashboard = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-medium mb-4">
-              {modalType === 'add' ? 'Add' : 'Edit'} {activeMetadataTab.slice(0, -1)}
+              {modalType === 'add' ? 'Add' : 'Edit'} Bin
             </h3>
             
-            <form onSubmit={handleEditMetadata}>
+            <form onSubmit={handleSubmitBin}>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Name
+                  Bin Name
                 </label>
                 <input
                   type="text"
@@ -432,7 +375,7 @@ const AdminDashboard = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
-                  placeholder={`Enter ${activeMetadataTab.slice(0, -1)} name`}
+                  placeholder="Enter bin name (e.g., A1, B2, Storage-001)"
                 />
               </div>
               

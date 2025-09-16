@@ -12,12 +12,16 @@ const insetSchema = new mongoose.Schema({
     uppercase: true
   },
   
+  // bin: {
+  //   type: String,
+  //   required: true,
+  //   trim: true
+  // },
   bin: {
     type: String,
-    required: true,
-    trim: true
+    ref: 'Bin',
+    required: true
   },
-  
   quantity: {
     type: Number,
     required: true,

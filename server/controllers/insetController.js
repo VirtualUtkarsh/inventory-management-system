@@ -63,19 +63,33 @@ const createInset = async (req, res) => {
     const savedInset = await inset.save();
     
     console.log('✅ Inset saved successfully:', savedInset._id);
-    console.log('Manual SKU ID:', savedInset.skuId);
+    console.log('SKU ID:', savedInset.skuId, 'Bin:', savedInset.bin);
 
-    // Update inventory - simplified call
+    // Update inventory - FIXED to handle SKU+bin combinations properly
     try {
       console.log('📦 Updating inventory...');
+      console.log(`Looking for existing inventory: SKU=${savedInset.skuId}, Bin=${savedInset.bin}`);
+      
       const inventoryItem = await Inventory.updateStock(
         savedInset.skuId,
         savedInset.quantity,
         savedInset.bin
       );
-      console.log('✅ Inventory updated:', inventoryItem.skuId);
+      
+      console.log('✅ Inventory updated:', {
+        skuId: inventoryItem.skuId,
+        bin: inventoryItem.bin,
+        quantity: inventoryItem.quantity
+      });
+      
+      // Log current inventory state for this SKU across all bins
+      const allBins = await Inventory.getBinsBySku(savedInset.skuId);
+      console.log(`📊 Current inventory for SKU ${savedInset.skuId}:`, allBins);
+      
     } catch (invError) {
       console.error('❌ Failed to update inventory:', invError.message);
+      // Continue with inset creation even if inventory update fails
+      console.log('⚠️  Inset recorded but inventory update failed');
     }
 
     console.log('=== INSET CREATION SUCCESS ===');
@@ -98,12 +112,20 @@ const createInset = async (req, res) => {
     }
 
     if (error.code === 11000) {
-      const duplicateField = Object.keys(error.keyPattern)[0];
-      return res.status(400).json({ 
-        message: `A record with this ${duplicateField} already exists`,
-        duplicateField: duplicateField,
-        value: error.keyValue[duplicateField]
-      });
+      // Handle duplicate key error - could be from inset or inventory
+      const duplicateField = Object.keys(error.keyPattern || {})[0];
+      if (duplicateField) {
+        return res.status(400).json({ 
+          message: `A record with this ${duplicateField} already exists`,
+          duplicateField: duplicateField,
+          value: error.keyValue[duplicateField]
+        });
+      } else {
+        return res.status(400).json({ 
+          message: 'Duplicate record detected. This SKU+bin combination may already exist.',
+          error: error.message
+        });
+      }
     }
 
     res.status(500).json({ 
@@ -197,7 +219,7 @@ const updateInset = async (req, res) => {
     
     if (error.code === 11000) {
       return res.status(400).json({ 
-        message: 'SKU ID already exists. Please use a different SKU ID.' 
+        message: 'This record combination already exists.' 
       });
     }
     

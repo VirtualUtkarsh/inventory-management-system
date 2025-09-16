@@ -8,7 +8,8 @@ const {
   updateQuantity,
   getInventoryStats,
   getLowStock,
-  searchInventory
+  searchInventory,
+  getInventoryBySKU  // NEW: Added the new endpoint
 } = require('../controllers/inventoryController');
 
 const { auth } = require('../middleware/auth');
@@ -38,36 +39,64 @@ router.get('/low-stock', getLowStock);
 // @access  Private
 router.get('/search', searchInventory);
 
+// @route   GET /api/inventory/sku/:skuId
+// @desc    Get all bins for a specific SKU
+// @access  Private
+router.get('/sku/:skuId', getInventoryBySKU);
+
 // @route   PUT /api/inventory/quantity
 // @desc    Update item quantity
 // @access  Private
 router.put('/quantity', updateQuantity);
 
-
-// ================= Legacy routes with Audit Log ================= //
+// ================= FIXED Legacy routes with Audit Log ================= //
 
 // @route   POST /api/inventory/inset
 // @desc    Add inbound inventory
 // @access  Private
 router.post('/inset', async (req, res) => {
-  const { sku, name, bin, quantity = 1 } = req.body;
+  const { sku, skuId, name, bin, quantity = 1 } = req.body;
+  
+  // Use skuId if provided, otherwise fall back to sku for backward compatibility
+  const productSku = skuId || sku;
 
   try {
-    const item = await Inventory.updateStock(sku, quantity, bin, name);
+    if (!productSku || !bin) {
+      return res.status(400).json({ 
+        msg: 'SKU ID and bin location are required',
+        required: ['skuId (or sku)', 'bin'],
+        received: { skuId: productSku, bin }
+      });
+    }
+
+    const item = await Inventory.updateStock(productSku, quantity, bin);
 
     // Audit log
     await new AuditLog({
-      actionType: 'CREATE',
-      collection: 'Inventory',
+      actionType: 'STOCK_INCREASE',
+      collectionName: 'Inventory',
       documentId: item._id,
-      changes: { sku, quantity, bin },
-      user: { id: req.user.id, name: req.user.name }
+      changes: { 
+        skuId: productSku, 
+        bin: bin,
+        quantity: quantity 
+      },
+      user: { 
+        id: req.userId, 
+        name: req.username 
+      }
     }).save();
 
-    res.json(item);
+    res.json({
+      message: 'Inventory updated successfully',
+      item: item
+    });
   } catch (err) {
-    console.error(err.message);
-    res.status(400).json({ msg: err.message });
+    console.error('Legacy inset error:', err.message);
+    res.status(400).json({ 
+      msg: err.message,
+      details: 'Make sure SKU and bin combination is valid'
+    });
   }
 });
 
@@ -75,24 +104,109 @@ router.post('/inset', async (req, res) => {
 // @desc    Remove outbound inventory
 // @access  Private
 router.post('/outset', async (req, res) => {
-  const { sku, quantity = 1 } = req.body;
+  const { sku, skuId, bin, quantity = 1 } = req.body;
+  
+  // Use skuId if provided, otherwise fall back to sku for backward compatibility
+  const productSku = skuId || sku;
 
   try {
-    const item = await Inventory.updateStock(sku, -quantity);
+    if (!productSku) {
+      return res.status(400).json({ 
+        msg: 'SKU ID is required',
+        received: { skuId: productSku }
+      });
+    }
+
+    // If no bin specified, try to find any bin with this SKU
+    let targetBin = bin;
+    if (!targetBin) {
+      const availableBins = await Inventory.getBinsBySku(productSku);
+      if (availableBins.length === 0) {
+        return res.status(404).json({ 
+          msg: 'Product not found in inventory',
+          skuId: productSku 
+        });
+      }
+      
+      // Find first bin with sufficient stock
+      const suitableBin = availableBins.find(b => b.quantity >= quantity);
+      if (!suitableBin) {
+        return res.status(400).json({ 
+          msg: 'Insufficient stock in any bin',
+          availableBins: availableBins,
+          requested: quantity
+        });
+      }
+      
+      targetBin = suitableBin.bin;
+    }
+
+    const item = await Inventory.updateStock(productSku, -quantity, targetBin);
 
     // Audit log
     await new AuditLog({
-      actionType: 'UPDATE',
-      collection: 'Inventory',
+      actionType: 'STOCK_DECREASE',
+      collectionName: 'Inventory',
       documentId: item._id,
-      changes: { quantity: -quantity },
-      user: { id: req.user.id, name: req.user.name }
+      changes: { 
+        skuId: productSku,
+        bin: targetBin, 
+        quantity: -quantity 
+      },
+      user: { 
+        id: req.userId, 
+        name: req.username 
+      }
     }).save();
 
-    res.json(item);
+    res.json({
+      message: 'Inventory updated successfully',
+      item: item,
+      removedFrom: targetBin
+    });
   } catch (err) {
-    console.error(err.message);
-    res.status(400).json({ msg: err.message });
+    console.error('Legacy outset error:', err.message);
+    res.status(400).json({ 
+      msg: err.message,
+      details: 'Make sure SKU has sufficient stock in the specified bin'
+    });
+  }
+});
+
+// ================= Helper routes for debugging ================= //
+
+// @route   GET /api/inventory/debug/all
+// @desc    Get ALL inventory items including zero stock (for debugging)
+// @access  Private
+router.get('/debug/all', async (req, res) => {
+  try {
+    const allItems = await Inventory.find()
+      .sort({ skuId: 1, bin: 1 })
+      .lean();
+    
+    // Group by SKU for easier debugging
+    const grouped = {};
+    allItems.forEach(item => {
+      if (!grouped[item.skuId]) {
+        grouped[item.skuId] = [];
+      }
+      grouped[item.skuId].push({
+        bin: item.bin,
+        quantity: item.quantity,
+        _id: item._id,
+        lastUpdated: item.lastUpdated
+      });
+    });
+    
+    res.json({
+      totalRecords: allItems.length,
+      uniqueSKUs: Object.keys(grouped).length,
+      items: allItems,
+      groupedBySKU: grouped
+    });
+  } catch (err) {
+    console.error('Debug inventory error:', err);
+    res.status(500).json({ msg: err.message });
   }
 });
 

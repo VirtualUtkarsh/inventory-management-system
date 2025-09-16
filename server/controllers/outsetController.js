@@ -16,7 +16,8 @@ const createOutset = async (req, res) => {
       skuId: 'SKU ID',
       quantity: 'Quantity',
       customerName: 'Customer Name',
-      invoiceNo: 'Invoice Number'
+      invoiceNo: 'Invoice Number',
+      bin: 'Bin Location'  // Now required since we need to know which bin to deduct from
     };
 
     // Check for missing fields
@@ -42,38 +43,53 @@ const createOutset = async (req, res) => {
 
     console.log('All validation passed');
 
-    // Check if inventory item exists and has sufficient stock
-    const inventoryItem = await Inventory.findOne({ skuId });
+    // FIXED: Check if inventory item exists for SPECIFIC SKU+bin combination
+    console.log(`Looking for inventory: SKU=${skuId}, Bin=${bin}`);
+    const inventoryItem = await Inventory.findOne({ skuId: skuId, bin: bin });
+    
     if (!inventoryItem) {
-      console.log('Inventory item not found for skuId:', skuId);
-      return res.status(404).json({ 
-        message: 'Product not found in inventory',
-        skuId: skuId
-      });
+      console.log('Inventory item not found for skuId + bin combination:', skuId, bin);
+      
+      // Check if SKU exists in other bins to provide helpful error message
+      const otherBins = await Inventory.getBinsBySku(skuId);
+      if (otherBins.length > 0) {
+        return res.status(404).json({ 
+          message: `Product not found in bin ${bin}. Available in bins: ${otherBins.map(b => `${b.bin}(${b.quantity})`).join(', ')}`,
+          skuId: skuId,
+          requestedBin: bin,
+          availableBins: otherBins
+        });
+      } else {
+        return res.status(404).json({ 
+          message: 'Product not found in inventory',
+          skuId: skuId
+        });
+      }
     }
 
     if (inventoryItem.quantity < quantity) {
-      console.log(`Insufficient stock - Available: ${inventoryItem.quantity}, Requested: ${quantity}`);
+      console.log(`Insufficient stock in bin ${bin} - Available: ${inventoryItem.quantity}, Requested: ${quantity}`);
+      
+      // Check total availability across all bins for helpful error message
+      const totalAvailable = await Inventory.getTotalQuantityBySku(skuId);
+      const allBins = await Inventory.getBinsBySku(skuId);
+      
       return res.status(400).json({ 
-        message: `Insufficient stock. Only ${inventoryItem.quantity} available`,
+        message: `Insufficient stock in bin ${bin}. Only ${inventoryItem.quantity} available in this bin`,
         available: inventoryItem.quantity,
-        requested: quantity
+        requested: quantity,
+        totalAcrossAllBins: totalAvailable,
+        availableInOtherBins: allBins.filter(b => b.bin !== bin)
       });
     }
 
     console.log('Stock check passed, updating inventory...');
 
-    // Update inventory first (negative quantity for outbound)
+    // FIXED: Update inventory for specific SKU+bin combination (negative quantity for outbound)
     const updatedInventoryItem = await Inventory.updateStock(
       skuId, 
       -quantity, 
-      bin || inventoryItem.bin, // Use provided bin or keep existing
-      inventoryItem.name, // Keep existing name
-      inventoryItem.baseSku, // Keep existing baseSku
-      inventoryItem.size, // Keep existing size
-      inventoryItem.color, // Keep existing color
-      inventoryItem.pack, // Keep existing pack
-      inventoryItem.category // Keep existing category
+      bin  // Use the specific bin that was selected
     );
 
     console.log('Inventory updated successfully, creating outset record...');
@@ -81,17 +97,10 @@ const createOutset = async (req, res) => {
     // Create outset record
     const outsetData = {
       skuId: skuId.trim(),
-      name: inventoryItem.name,
       quantity: Number(quantity),
-      bin: bin || inventoryItem.bin,
+      bin: bin.trim(), // Store the specific bin used
       customerName: customerName.trim(),
       invoiceNo: invoiceNo.trim(),
-      // Include metadata for better tracking
-      baseSku: inventoryItem.baseSku,
-      size: inventoryItem.size,
-      color: inventoryItem.color,
-      pack: inventoryItem.pack,
-      category: inventoryItem.category,
       user: user || {
         id: req.userId,
         name: req.username
@@ -112,6 +121,7 @@ const createOutset = async (req, res) => {
       documentId: savedOutset._id,
       changes: {
         skuId: skuId,
+        bin: bin,
         quantity: -quantity,
         customerName: customerName,
         invoiceNo: invoiceNo,
@@ -125,12 +135,17 @@ const createOutset = async (req, res) => {
     });
     await log.save();
 
+    // Log current inventory state for this SKU across all bins
+    const allBins = await Inventory.getBinsBySku(skuId);
+    console.log(`📊 Current inventory for SKU ${skuId} after outbound:`, allBins);
+
     console.log('=== OUTSET CREATION SUCCESS ===');
     res.status(201).json({
       message: 'Outbound record created successfully',
       outset: savedOutset,
       inventoryUpdate: {
         skuId: skuId,
+        bin: bin,
         oldQuantity: inventoryItem.quantity,
         newQuantity: updatedInventoryItem.quantity,
         removed: quantity
@@ -157,6 +172,14 @@ const createOutset = async (req, res) => {
         message: 'Validation Error', 
         errors: errors,
         details: err.errors
+      });
+    }
+
+    // Handle duplicate key errors (SKU+bin combination already exists in outsets)
+    if (err.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Duplicate outbound record detected',
+        error: err.message
       });
     }
 

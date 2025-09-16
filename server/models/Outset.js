@@ -15,11 +15,16 @@ const outsetSchema = new mongoose.Schema({
     required: true,
     min: 1
   },
+  // bin: {
+  //   type: String,
+  //   required: true,
+  //   trim: true
+  // },
   bin: {
-    type: String,
-    required: true,
-    trim: true
-  },
+  type: String,
+  ref: 'Bin',
+  required: true
+},
   customerName: {
     type: String,
     required: true,

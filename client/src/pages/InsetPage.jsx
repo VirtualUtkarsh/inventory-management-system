@@ -15,9 +15,11 @@ const InsetPage = () => {
 
   const [insets, setInsets] = useState([]);
   const [filteredInsets, setFilteredInsets] = useState([]);
+  const [bins, setBins] = useState([]); // Available bins from admin
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [binsLoading, setBinsLoading] = useState(true);
 
   // Simplified filter states
   const [filters, setFilters] = useState({
@@ -30,6 +32,24 @@ const InsetPage = () => {
     recentOnly: false,
     todayOnly: false
   });
+
+  // Fetch available bins
+  const fetchBins = useCallback(async () => {
+    try {
+      const res = await axiosInstance.get('/api/metadata/bins', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBins(res.data);
+    } catch (err) {
+      console.error('Error fetching bins:', err);
+      // If no bins are available, show a message
+      if (err.response?.status === 404) {
+        setError('No bins available. Please contact admin to add bins first.');
+      }
+    } finally {
+      setBinsLoading(false);
+    }
+  }, [token]);
 
   // Fetch insets using useCallback
   const fetchInsets = useCallback(async () => {
@@ -50,8 +70,9 @@ const InsetPage = () => {
   }, [token]);
 
   useEffect(() => {
+    fetchBins();
     fetchInsets();
-  }, [fetchInsets]);
+  }, [fetchBins, fetchInsets]);
 
   // Apply filters whenever filters or insets changes
   useEffect(() => {
@@ -194,7 +215,7 @@ const InsetPage = () => {
     // Prepare submission data with user info
     const submissionData = {
       skuId: formData.skuId.trim().toUpperCase(),
-      bin: formData.bin.trim().toUpperCase(),
+      bin: formData.bin, // Keep as selected from dropdown
       quantity: Number(formData.quantity),
       user: {
         id: user.id,
@@ -233,6 +254,12 @@ const InsetPage = () => {
     });
     setShowForm(false);
     setError(null);
+  };
+
+  // Get unique bins from filtered insets for filter dropdown
+  const getUniqueBins = () => {
+    const uniqueBins = [...new Set(insets.map(item => item.bin).filter(Boolean))];
+    return uniqueBins.sort();
   };
 
   // Download CSV function
@@ -332,6 +359,26 @@ const InsetPage = () => {
   // Calculate metrics
   const totalInbound = insets.length;
 
+  // Show loading if bins are still loading
+  if (binsLoading) {
+    return <div className="p-4 text-lg">Loading bins...</div>;
+  }
+
+  // Show error if no bins available
+  if (bins.length === 0 && !binsLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">No Bins Available</h2>
+          <p className="text-gray-600 mb-4">No bins have been configured yet. Please contact your administrator to add bins before creating inbound records.</p>
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+            Admin can add bins from the Admin Dashboard → Bins Manager
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
@@ -380,17 +427,20 @@ const InsetPage = () => {
               />
             </div>
 
-            {/* Bin Filter */}
+            {/* Bin Filter - Now using dropdown */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Bin Location</label>
-              <input
-                type="text"
+              <select
                 name="bin"
                 value={filters.bin}
                 onChange={handleFilterChange}
-                placeholder="Filter by bin..."
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="">All Bins</option>
+                {getUniqueBins().map(bin => (
+                  <option key={bin} value={bin}>{bin}</option>
+                ))}
+              </select>
             </div>
 
             {/* User Name Filter */}
@@ -531,18 +581,24 @@ const InsetPage = () => {
                   />
                 </div>
 
-                {/* Bin Location */}
+                {/* Bin Location - Now a dropdown */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bin Location *</label>
-                  <input
-                    type="text"
+                  <select
                     name="bin"
                     value={formData.bin}
                     onChange={handleChange}
-                    placeholder="e.g. A1-B2"
                     required
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  >
+                    <option value="">Select a bin...</option>
+                    {bins.map(bin => (
+                      <option key={bin._id} value={bin.name}>{bin.name}</option>
+                    ))}
+                  </select>
+                  {bins.length === 0 && (
+                    <p className="text-sm text-red-600 mt-1">No bins available. Contact admin to add bins.</p>
+                  )}
                 </div>
 
                 {/* Quantity */}
@@ -564,7 +620,7 @@ const InsetPage = () => {
               <div className="mt-6 flex space-x-3">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || bins.length === 0}
                   className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-2 rounded-md transition-colors"
                 >
                   {loading ? 'Saving...' : 'Save Inbound'}
