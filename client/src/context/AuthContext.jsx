@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import axiosInstance from '../utils/axiosInstance'; // Import our custom axios instance
+import axiosInstance from '../utils/axiosInstance';
 import jwt_decode from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
@@ -37,16 +37,13 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('📝 Attempting register with axiosInstance...');
       const { data } = await axiosInstance.post('/api/auth/register', { name, email, password });
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
-      setUser(data.user);
       
-      // Navigate based on user role
-      if (data.user?.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/inventory');
-      }
+      // Note: After registration, users are pending approval
+      // Don't set token/user or navigate - show success message instead
+      return {
+        success: true,
+        message: data.message || 'Registration successful. Awaiting admin approval.'
+      };
     } catch (error) {
       console.error('Register error:', error);
       throw error.response?.data || error.message;
@@ -58,6 +55,16 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     navigate('/login');
+  };
+
+  // Check if user is admin
+  const isAdmin = () => {
+    return user && user.role === 'admin';
+  };
+
+  // Check if user is approved
+  const isApproved = () => {
+    return user && user.status === 'approved';
   };
 
   useEffect(() => {
@@ -72,8 +79,6 @@ export const AuthProvider = ({ children }) => {
         if (decoded.exp * 1000 < Date.now()) {
           logout();
         } else {
-          // Set token for axiosInstance (this is handled by the interceptor)
-          
           // Always try to fetch user data if we don't have it
           if (!user) {
             console.log('🔍 Fetching user from /api/auth/me');
@@ -83,9 +88,8 @@ export const AuthProvider = ({ children }) => {
               setUser(res.data.user);
             } catch (error) {
               console.error('🔍 /api/auth/me failed:', error);
-              // If /me route fails, try to decode user from token
-              // This is a fallback, but won't have role info
-              console.log('🔍 Falling back to token-only auth');
+              // If /me route fails, logout to be safe
+              logout();
             }
           }
         }
@@ -99,7 +103,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
-  }, [token, user]); // Added user to dependency array
+  }, [token, user]);
 
   // DEBUG: Log current state
   console.log('🔍 AuthContext state:', { user: user?.role, token: !!token, loading });
@@ -111,7 +115,9 @@ export const AuthProvider = ({ children }) => {
       loading,
       login,
       register,
-      logout
+      logout,
+      isAdmin,
+      isApproved
     }}>
       {children}
     </AuthContext.Provider>

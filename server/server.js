@@ -18,14 +18,14 @@ dotenv.config();
 const app = express();
 
 // ====================
-// Middleware
+// Middleware (MUST come BEFORE routes)
 // ====================
 
 const corsOptions = {
   origin: [
     'http://localhost:3000',
     /\.devtunnels\.ms$/,
-    /.*\.vercel\.app$/, // ✅ This will match ANY Vercel app URL - future-proof!
+    /.*\.vercel\.app$/,
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [
@@ -38,15 +38,15 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Preflight requests
+app.options('*', cors(corsOptions));
 
-// ✅ Essential middleware
+// ✅ Essential middleware - MUST come before routes
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // ====================
-// Routes
+// Routes (AFTER middleware)
 // ====================
 
 app.use('/api/admin', adminRoutes);

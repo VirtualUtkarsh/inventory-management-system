@@ -60,26 +60,41 @@ router.post('/login', [
   check('email', 'Please include a valid email').isEmail(),
   check('password', 'Password is required').exists()
 ], async (req, res) => {
+  // DEBUG: Log the incoming request
+  console.log('=== LOGIN REQUEST DEBUG ===');
+  console.log('Request body:', req.body);
+  console.log('Request headers:', req.headers);
+  console.log('Content-Type:', req.headers['content-type']);
+  
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log('Validation errors:', errors.array());
     return res.status(400).json({ message: errors.array()[0].msg });
   }
 
   const { email, password } = req.body;
+  console.log('Extracted email:', email);
+  console.log('Extracted password length:', password ? password.length : 'undefined');
 
   try {
     // Find user and include password field
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
+      console.log('User not found for email:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+
+    console.log('User found:', { id: user._id, email: user.email, role: user.role, status: user.status });
 
     // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.log('Password mismatch for user:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+
     if (user.status !== 'approved') {
+      console.log('User not approved:', { email, status: user.status });
       return res.status(403).json({ message: 'Your account is not yet approved.' });
     }
 
@@ -93,7 +108,9 @@ router.post('/login', [
       email: user.email,
       role: user.role,
       status: user.status
-    };;
+    };
+
+    console.log('Login successful for:', email);
 
     res.json({
       token,
@@ -101,7 +118,7 @@ router.post('/login', [
     });
 
   } catch (err) {
-    console.error(err.message);
+    console.error('Login error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });

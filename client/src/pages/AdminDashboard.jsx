@@ -9,6 +9,7 @@ const AdminDashboard = () => {
   // User Management State
   const [pendingUsers, setPendingUsers] = useState([]);
   const [approvedUsers, setApprovedUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [userLoading, setUserLoading] = useState(true);
   
   // Bins State
@@ -17,8 +18,9 @@ const AdminDashboard = () => {
   
   // UI State
   const [activeTab, setActiveTab] = useState('users');
+  const [userView, setUserView] = useState('pending'); // 'pending', 'approved', 'all'
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState('add'); // 'add' or 'edit'
+  const [modalType, setModalType] = useState('add');
   const [editingBin, setEditingBin] = useState(null);
   const [formData, setFormData] = useState({ name: '' });
 
@@ -26,17 +28,21 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const [pendingRes, approvedRes] = await Promise.all([
+        const [pendingRes, approvedRes, allRes] = await Promise.all([
           axiosInstance.get('/api/admin/pending-users', {
             headers: { Authorization: `Bearer ${token}` }
           }),
           axiosInstance.get('/api/admin/approved-users', {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axiosInstance.get('/api/admin/all-users', {
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);
         
         setPendingUsers(pendingRes.data);
         setApprovedUsers(approvedRes.data);
+        setAllUsers(allRes.data);
       } catch (err) {
         console.error('Error fetching users:', err);
       } finally {
@@ -57,7 +63,6 @@ const AdminDashboard = () => {
         setBins(response.data);
       } catch (err) {
         console.error('Error fetching bins:', err);
-        // If bins route not found, show helpful message
         if (err.response?.status === 404) {
           console.log('Bins routes not found. Make sure you added bins routes to server.js');
         }
@@ -69,42 +74,65 @@ const AdminDashboard = () => {
   }, [token]);
 
   // User Management Functions
-  const handlePendingAction = async (id, action) => {
+  const handleUserAction = async (id, action) => {
     try {
-      const method = 'put';
-      const url = `/api/admin/${id}/${action}`;
-
-      await axiosInstance({
-        method,
-        url,
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await axiosInstance.put(`/api/admin/${id}/${action}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      setPendingUsers(prevUsers => prevUsers.filter(user => user._id !== id));
+      // Refresh user data
+      const [pendingRes, approvedRes, allRes] = await Promise.all([
+        axiosInstance.get('/api/admin/pending-users', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axiosInstance.get('/api/admin/approved-users', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axiosInstance.get('/api/admin/all-users', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
       
-      if (action === 'approve') {
-        const approvedUser = pendingUsers.find(user => user._id === id);
-        if (approvedUser) {
-          setApprovedUsers(prevUsers => [...prevUsers, { ...approvedUser, status: 'approved' }]);
-        }
-      }
+      setPendingUsers(pendingRes.data);
+      setApprovedUsers(approvedRes.data);
+      setAllUsers(allRes.data);
       
-      console.log(`${action} successful for user ${id}`);
+      alert(response.data.message || `${action} successful`);
     } catch (err) {
       console.error(`${action} failed:`, err.response?.data || err);
+      alert(err.response?.data?.message || `${action} failed`);
     }
   };
 
-  const handleDeleteApproved = async (id) => {
+  const handleDeleteUser = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    
     try {
-      await axiosInstance.delete(`/api/admin/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await axiosInstance.delete(`/api/admin/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      setApprovedUsers(prevUsers => prevUsers.filter(user => user._id !== id));
-      console.log(`Delete successful for user ${id}`);
+      // Refresh user data
+      const [pendingRes, approvedRes, allRes] = await Promise.all([
+        axiosInstance.get('/api/admin/pending-users', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axiosInstance.get('/api/admin/approved-users', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axiosInstance.get('/api/admin/all-users', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+      
+      setPendingUsers(pendingRes.data);
+      setApprovedUsers(approvedRes.data);
+      setAllUsers(allRes.data);
+      
+      alert(response.data.message || 'User deleted successfully');
     } catch (err) {
-      console.error(`Delete failed:`, err.response?.data || err);
+      console.error('Delete failed:', err.response?.data || err);
+      alert(err.response?.data?.message || 'Delete failed');
     }
   };
 
@@ -135,7 +163,6 @@ const AdminDashboard = () => {
       console.log('Bin delete successful');
     } catch (err) {
       console.error('Bin delete failed:', err);
-      // You might want to show an error message to the user here
       alert('Failed to delete bin. It might be in use by existing inventory items.');
     }
   };
@@ -165,7 +192,6 @@ const AdminDashboard = () => {
       console.log(`Bin ${modalType} successful`);
     } catch (err) {
       console.error(`Bin ${modalType} failed:`, err);
-      // You might want to show an error message to the user here
       alert(`Failed to ${modalType} bin. Please try again.`);
     }
   };
@@ -174,6 +200,31 @@ const AdminDashboard = () => {
     setIsModalOpen(false);
     setFormData({ name: '' });
     setEditingBin(null);
+  };
+
+  // Helper functions
+  const getStatusBadge = (status) => {
+    const colors = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      approved: 'bg-green-100 text-green-800',
+      rejected: 'bg-red-100 text-red-800'
+    };
+    return `${colors[status]} px-2 py-1 rounded-full text-sm`;
+  };
+
+  const getRoleBadge = (role) => {
+    return role === 'admin' 
+      ? 'bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-sm'
+      : 'bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm';
+  };
+
+  const getCurrentUsers = () => {
+    switch (userView) {
+      case 'pending': return pendingUsers;
+      case 'approved': return approvedUsers;
+      case 'all': return allUsers;
+      default: return pendingUsers;
+    }
   };
 
   if (userLoading && binsLoading) {
@@ -212,12 +263,55 @@ const AdminDashboard = () => {
 
       {/* Users Tab Content */}
       {activeTab === 'users' && (
-        <div className="space-y-8">
-          {/* Pending Users Section */}
+        <div className="space-y-6">
+          {/* User View Toggle */}
+          <div className="flex space-x-4 mb-4">
+            <button
+              onClick={() => setUserView('pending')}
+              className={`px-4 py-2 rounded ${
+                userView === 'pending'
+                  ? 'bg-yellow-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Pending ({pendingUsers.length})
+            </button>
+            <button
+              onClick={() => setUserView('approved')}
+              className={`px-4 py-2 rounded ${
+                userView === 'approved'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Approved ({approvedUsers.length})
+            </button>
+            <button
+              onClick={() => setUserView('all')}
+              className={`px-4 py-2 rounded ${
+                userView === 'all'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              All Users ({allUsers.length})
+            </button>
+          </div>
+
+          {/* Users Table */}
           <div>
-            <h1 className="text-2xl font-bold mb-4">Pending Users</h1>
-            {pendingUsers.length === 0 ? (
-              <p className="text-gray-600">No pending users 🎉</p>
+            <h1 className="text-2xl font-bold mb-4">
+              {userView === 'pending' && 'Pending Users'}
+              {userView === 'approved' && 'Approved Users'}
+              {userView === 'all' && 'All Users'}
+            </h1>
+            
+            {getCurrentUsers().length === 0 ? (
+              <p className="text-gray-600">
+                {userView === 'pending' ? 'No pending users 🎉' : 
+                 userView === 'approved' ? 'No approved users yet.' :
+                 'No users found.'}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full border border-gray-300 rounded-lg">
@@ -225,69 +319,72 @@ const AdminDashboard = () => {
                     <tr className="bg-gray-100">
                       <th className="px-4 py-2 text-left">Name</th>
                       <th className="px-4 py-2 text-left">Email</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left">Role</th>
                       <th className="px-4 py-2 text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingUsers.map(u => (
+                    {getCurrentUsers().map(u => (
                       <tr key={u._id} className="border-t hover:bg-gray-50">
                         <td className="px-4 py-2">{u.name}</td>
                         <td className="px-4 py-2">{u.email}</td>
-                        <td className="px-4 py-2 space-x-2">
-                          <button 
-                            onClick={() => handlePendingAction(u._id, 'approve')} 
-                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition-colors"
-                          >
-                            Approve
-                          </button>
-                          <button 
-                            onClick={() => handlePendingAction(u._id, 'reject')} 
-                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition-colors"
-                          >
-                            Reject
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Approved Users Section */}
-          <div>
-            <h1 className="text-2xl font-bold mb-4">Users</h1>
-            {approvedUsers.length === 0 ? (
-              <p className="text-gray-600">No approved users yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-300 rounded-lg">
-                  <thead>
-                    <tr className="bg-blue-100">
-                      <th className="px-4 py-2 text-left">Name</th>
-                      <th className="px-4 py-2 text-left">Email</th>
-                      <th className="px-4 py-2 text-left">Status</th>
-                      <th className="px-4 py-2 text-left">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {approvedUsers.map(u => (
-                      <tr key={u._id} className="border-t hover:bg-blue-50">
-                        <td className="px-4 py-2">{u.name}</td>
-                        <td className="px-4 py-2">{u.email}</td>
                         <td className="px-4 py-2">
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
-                            Approved
+                          <span className={getStatusBadge(u.status)}>
+                            {u.status}
                           </span>
                         </td>
                         <td className="px-4 py-2">
-                          <button 
-                            onClick={() => handleDeleteApproved(u._id)} 
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors"
-                          >
-                            Delete
-                          </button>
+                          <span className={getRoleBadge(u.role)}>
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 space-x-2">
+                          {userView === 'pending' && (
+                            <>
+                              <button 
+                                onClick={() => handleUserAction(u._id, 'approve')} 
+                                className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition-colors text-sm"
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                onClick={() => handleUserAction(u._id, 'reject')} 
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition-colors text-sm"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          
+                          {userView === 'all' && (
+                            <>
+                              <button 
+                                onClick={() => handleUserAction(u._id, 'toggle-status')} 
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-colors text-sm"
+                              >
+                                Change Status
+                              </button>
+                              
+                              {u._id !== user.id && (
+                                <button 
+                                  onClick={() => handleUserAction(u._id, 'toggle-admin')} 
+                                  className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded transition-colors text-sm"
+                                >
+                                  {u.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+                                </button>
+                              )}
+                            </>
+                          )}
+                          
+                          {u._id !== user.id && (
+                            <button 
+                              onClick={() => handleDeleteUser(u._id)} 
+                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors text-sm"
+                            >
+                              Delete
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

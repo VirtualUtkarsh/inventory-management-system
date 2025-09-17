@@ -26,6 +26,16 @@ const getApprovedUsers = async (req, res) => {
   }
 };
 
+// GET /api/admin/all-users - NEW: Get all users with their roles
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({}).select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch users' });
+  }
+};
+
 // PUT /api/admin/:id/approve
 const approveUser = async (req, res) => {
   try {
@@ -58,12 +68,111 @@ const rejectUser = async (req, res) => {
   }
 };
 
+// PUT /api/admin/:id/toggle-admin - NEW: Toggle admin privileges
+const toggleAdminRole = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent user from removing their own admin privileges
+    if (user._id.toString() === req.user._id.toString() && user.role === 'admin') {
+      return res.status(400).json({ 
+        message: 'Cannot remove admin privileges from yourself' 
+      });
+    }
+
+    // Toggle role between user and admin
+    const newRole = user.role === 'admin' ? 'user' : 'admin';
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { role: newRole },
+      { new: true }
+    ).select('-password');
+
+    res.json({ 
+      message: `User ${updatedUser.name} is now ${newRole === 'admin' ? 'an admin' : 'a regular user'}`,
+      user: updatedUser
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to toggle admin role' });
+  }
+};
+
+// PUT /api/admin/:id/toggle-status - NEW: Toggle user approval status
+const toggleUserStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent admin from changing their own status
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ 
+        message: 'Cannot change your own approval status' 
+      });
+    }
+
+    // Cycle through statuses: pending -> approved -> rejected -> pending
+    let newStatus;
+    switch (user.status) {
+      case 'pending':
+        newStatus = 'approved';
+        break;
+      case 'approved':
+        newStatus = 'rejected';
+        break;
+      case 'rejected':
+        newStatus = 'pending';
+        break;
+      default:
+        newStatus = 'pending';
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { status: newStatus },
+      { new: true }
+    ).select('-password');
+
+    res.json({ 
+      message: `User ${updatedUser.name} status changed to ${newStatus}`,
+      user: updatedUser
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to toggle user status' });
+  }
+};
+
 // DELETE /api/admin/:id
 const deleteUser = async (req, res) => {
   try {
-    const deletedUser = await User.findByIdAndDelete(req.params.id);
-    if (!deletedUser)
+    const user = await User.findById(req.params.id);
+    if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent admin from deleting themselves
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ 
+        message: 'Cannot delete your own account' 
+      });
+    }
+
+    // Check if this is the last admin
+    if (user.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(400).json({ 
+          message: 'Cannot delete the last admin user' 
+        });
+      }
+    }
+
+    await User.findByIdAndDelete(req.params.id);
     res.json({ message: 'User deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to delete user' });
@@ -194,8 +303,11 @@ const toggleCleanupService = async (req, res) => {
 module.exports = {
   getPendingUsers,
   getApprovedUsers,
+  getAllUsers,
   approveUser,
   rejectUser,
+  toggleAdminRole,
+  toggleUserStatus,
   deleteUser,
   getCleanupStats,
   triggerManualCleanup,
