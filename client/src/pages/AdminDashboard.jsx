@@ -276,7 +276,7 @@ const AdminDashboard = () => {
             >
               Pending ({pendingUsers.length})
             </button>
-            <button
+            {/* <button
               onClick={() => setUserView('approved')}
               className={`px-4 py-2 rounded ${
                 userView === 'approved'
@@ -285,7 +285,7 @@ const AdminDashboard = () => {
               }`}
             >
               Approved ({approvedUsers.length})
-            </button>
+            </button> */}
             <button
               onClick={() => setUserView('all')}
               className={`px-4 py-2 rounded ${

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from '../utils/axiosInstance';
 import { toast } from 'react-toastify';
 import InventoryTable from '../components/InventoryTable';
+import ExcelImport from '../components/ExcelImport';
 import 'react-toastify/dist/ReactToastify.css';
 
 const InventoryPage = () => {
@@ -11,6 +12,7 @@ const InventoryPage = () => {
   const [filteredInventory, setFilteredInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
   
   // Refs to handle race conditions and cleanup
   const abortControllerRef = useRef(null);
@@ -26,15 +28,9 @@ const InventoryPage = () => {
     fromDate: '',
     toDate: '',
     lowStock: false,
-    outOfStock: false
+    outOfStock: false,
+    bin: ''
   });
-
-  // Metadata for filters
-  // const [metadata, setMetadata] = useState({
-  //   sizes: [],
-  //   categories: [],
-  //   baseSKUs: []
-  // });
 
   // Cleanup function for component unmount
   useEffect(() => {
@@ -46,6 +42,92 @@ const InventoryPage = () => {
       }
     };
   }, []);
+
+  // Fetch inventory function
+  const fetchInventory = useCallback(async () => {
+    try {
+      // Cancel any ongoing request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+      const currentRequestId = ++requestIdRef.current;
+
+      setLoading(true);
+      setError('');
+
+      const { data } = await axios.get('/api/inventory', {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abortControllerRef.current.signal
+      });
+
+      // Check if component is still mounted and this is the latest request
+      if (!isMountedRef.current || currentRequestId !== requestIdRef.current) {
+        return;
+      }
+
+      setInventory(data);
+      setFilteredInventory(data);
+      
+    } catch (err) {
+      // Don't show error if request was aborted (race condition handling)
+      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
+
+      // Check if component is still mounted
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setError('Failed to fetch inventory');
+      toast.error('Error loading inventory');
+      console.error('Inventory fetch error:', err);
+    } finally {
+      // Only update loading state if component is still mounted
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [token]);
+
+  // Handle Excel import completion
+  const handleImportComplete = useCallback((results) => {
+    console.log('Import completed:', results);
+    setShowImportModal(false);
+    
+    if (results.data && results.data.results && results.data.results.summary) {
+      const { summary } = results.data.results;
+      
+      if (summary.successCount > 0) {
+        toast.success(
+          `Successfully imported ${summary.successCount} items. ` +
+          `${summary.createdBinsCount > 0 ? `Created ${summary.createdBinsCount} new bins. ` : ''}` +
+          `Refreshing inventory...`
+        );
+        
+        // Refresh inventory data after successful import
+        setTimeout(() => {
+          fetchInventory();
+        }, 1000);
+      }
+      
+      if (summary.errorCount > 0) {
+        toast.warning(`${summary.errorCount} items had errors during import.`);
+      }
+      
+      if (summary.warningCount > 0) {
+        toast.info(`${summary.warningCount} items had warnings during import.`);
+      }
+    } else {
+      toast.success('Import completed successfully. Refreshing inventory...');
+      setTimeout(() => {
+        fetchInventory();
+      }, 1000);
+    }
+  }, [fetchInventory]);
 
   // Download CSV function
   const downloadCSV = () => {
@@ -148,86 +230,13 @@ const InventoryPage = () => {
       </body>
       </html>
     `;
-//remvoved from print:
-/*               
-              <th>Base SKU</th>
-              <th>Name</th>
-              <th>Size</th>
-              <th>Category</th>
 
-              <td>${item.baseSku || ''}</td>
-                <td>${item.name || ''}</td>
-                <td>${item.size || ''}</td>
-                <td>${item.category || ''}</td>
-
-*/
     printWindow.document.write(printContent);
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
     printWindow.close();
   };
-
-  const fetchInventory = useCallback(async () => {
-    try {
-      // Cancel any ongoing request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      // Create new abort controller for this request
-      abortControllerRef.current = new AbortController();
-      const currentRequestId = ++requestIdRef.current;
-
-      setLoading(true);
-      setError('');
-
-      const { data } = await axios.get('/api/inventory', {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: abortControllerRef.current.signal
-      });
-
-      // Check if component is still mounted and this is the latest request
-      if (!isMountedRef.current || currentRequestId !== requestIdRef.current) {
-        return;
-      }
-
-      setInventory(data);
-      setFilteredInventory(data);
-      
-      // Extract unique values for filters
-      // const uniqueBaseSKUs = [...new Set(data.map(item => item.baseSku).filter(Boolean))];
-      // const uniqueSizes = [...new Set(data.map(item => item.size).filter(Boolean))];
-      // const uniqueCategories = [...new Set(data.map(item => item.category).filter(Boolean))];
-      
-      // setMetadata(prev => ({
-      //   ...prev,
-      //   baseSKUs: uniqueBaseSKUs.sort(),
-      //   sizes: uniqueSizes.sort(),
-      //   // categories: uniqueCategories.sort()
-      // }));
-      
-    } catch (err) {
-      // Don't show error if request was aborted (race condition handling)
-      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-        return;
-      }
-
-      // Check if component is still mounted
-      if (!isMountedRef.current) {
-        return;
-      }
-
-      setError('Failed to fetch inventory');
-      toast.error('Error loading inventory');
-      console.error('Inventory fetch error:', err);
-    } finally {
-      // Only update loading state if component is still mounted
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [token]);
 
   // Initial fetch
   useEffect(() => {
@@ -248,27 +257,6 @@ const InventoryPage = () => {
         (item.name || '').toLowerCase().includes(searchTerm)
       );
     }
-
-    //sku id filter
-    //   if (filters.skuId) {
-    //   filtered = filtered.filter(item => 
-    //     (item.skuId || '').toLowerCase().includes(filters.skuId.toLowerCase())
-    //   );
-    // }
-    // Base SKU filter
-    // if (filters.baseSku) {
-    //   filtered = filtered.filter(item => item.baseSku === filters.baseSku);
-    // }
-
-    // // Size filter
-    // if (filters.size) {
-    //   filtered = filtered.filter(item => item.size === filters.size);
-    // }
-
-    // // Category filter
-    // if (filters.category) {
-    //   filtered = filtered.filter(item => item.category === filters.category);
-    // }
 
     // Date range filters
     if (filters.fromDate) {
@@ -298,7 +286,8 @@ const InventoryPage = () => {
     if (filters.outOfStock) {
       filtered = filtered.filter(item => item.quantity === 0);
     }
-        // Bin filter
+
+    // Bin filter
     if (filters.bin) {
       filtered = filtered.filter(item => 
         (item.bin || '').toLowerCase().includes(filters.bin.toLowerCase())
@@ -319,13 +308,14 @@ const InventoryPage = () => {
   const clearFilters = useCallback(() => {
     setFilters({
       search: '',
-      // baseSku: '',
-      // size: '',
-      // category: '',
+      baseSku: '',
+      size: '',
+      category: '',
       fromDate: '',
       toDate: '',
       lowStock: false,
-      outOfStock: false
+      outOfStock: false,
+      bin: ''
     });
   }, []);
 
@@ -342,7 +332,7 @@ const InventoryPage = () => {
   const lowStockCount = inventory.filter(item => item.quantity > 0 && item.quantity < 10).length;
   const outOfStockCount = inventory.filter(item => item.quantity === 0).length;
   const uniqueBins = new Set(inventory.map(item => item.bin).filter(Boolean)).size;
-  const uniqueBaseSKUs = new Set(inventory.map(item => item.baseSku).filter(Boolean)).size;
+  // const uniqueBaseSKUs = new Set(inventory.map(item => item.baseSku).filter(Boolean)).size;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -375,10 +365,10 @@ const InventoryPage = () => {
             <p className="text-2xl font-bold">{outOfStockCount}</p>
           </div>
           
-          <div className="bg-purple-100 text-purple-800 p-4 rounded-lg shadow-sm">
+          {/* <div className="bg-purple-100 text-purple-800 p-4 rounded-lg shadow-sm">
             <h4 className="text-xs font-semibold uppercase tracking-wide">Base SKUs</h4>
             <p className="text-2xl font-bold">{uniqueBaseSKUs}</p>
-          </div>
+          </div> */}
           
           <div className="bg-indigo-100 text-indigo-800 p-4 rounded-lg shadow-sm">
             <h4 className="text-xs font-semibold uppercase tracking-wide">Bins Used</h4>
@@ -399,9 +389,8 @@ const InventoryPage = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Search */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search SKU/Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search SKU</label>
               <input
                 type="text"
                 name="search"
@@ -412,55 +401,7 @@ const InventoryPage = () => {
               />
             </div>
 
-            {/* Base SKU Filter */}
-            {/* <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Base SKU</label>
-              <select
-                name="baseSku"
-                value={filters.baseSku}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Base SKUs</option>
-                {metadata.baseSKUs.map(sku => (
-                  <option key={sku} value={sku}>{sku}</option>
-                ))}
-              </select>
-            </div> */}
-{/* 
-            Size Filter
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
-              <select
-                name="size"
-                value={filters.size}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Sizes</option>
-                {metadata.sizes.map(size => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div> */}
-
-            {/* Category Filter */}
-            {/* <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select
-                name="category"
-                value={filters.category}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Categories</option>
-                {metadata.categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div> */}
-
-          <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Bin Location</label>
               <input
                 type="text"
@@ -471,7 +412,8 @@ const InventoryPage = () => {
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          <div>
+            
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
               <input
                 type="date"
@@ -481,7 +423,8 @@ const InventoryPage = () => {
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          <div>
+            
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
               <input
                 type="date"
@@ -503,7 +446,7 @@ const InventoryPage = () => {
                   name="lowStock"
                   checked={filters.lowStock}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Low Stock (&lt; 10)</span>
               </label>
@@ -514,7 +457,7 @@ const InventoryPage = () => {
                   name="outOfStock"
                   checked={filters.outOfStock}
                   onChange={handleFilterChange}
-                  className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                 />
                 <span className="text-sm text-gray-700">Out of Stock</span>
               </label>
@@ -530,6 +473,17 @@ const InventoryPage = () => {
           </p>
           <div className="flex gap-2">
             <button
+              onClick={() => setShowImportModal(true)}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md transition-colors flex items-center gap-2"
+              title="Import inventory from Excel"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Import Excel
+            </button>
+            
+            <button
               onClick={downloadCSV}
               disabled={filteredInventory.length === 0}
               className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors flex items-center gap-1"
@@ -540,6 +494,7 @@ const InventoryPage = () => {
               </svg>
               CSV
             </button>
+            
             <button
               onClick={printTable}
               disabled={filteredInventory.length === 0}
@@ -570,12 +525,20 @@ const InventoryPage = () => {
         ) : inventory.length === 0 ? (
           <div className="text-center text-gray-500 py-12">
             <p className="text-lg mb-2">No inventory records found</p>
-            <p className="text-sm">Add some inbound items to populate your inventory</p>
+            <p className="text-sm">Add some inbound items or import from Excel to populate your inventory</p>
           </div>
         ) : (
           <InventoryTable 
             inventory={filteredInventory} 
             onRefresh={throttledRefresh}
+          />
+        )}
+
+        {/* Excel Import Modal */}
+        {showImportModal && (
+          <ExcelImport
+            onClose={() => setShowImportModal(false)}
+            onImportComplete={handleImportComplete}
           />
         )}
       </div>

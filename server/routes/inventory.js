@@ -14,6 +14,64 @@ const {
 
 const { auth } = require('../middleware/auth');
 
+const multer = require('multer');
+const { importInventoryExcel } = require('../controllers/inventoryController');
+
+// Configure multer for file upload (memory storage for Excel processing)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 1 // Only one file at a time
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept Excel files
+    if (file.mimetype.includes('spreadsheet') || 
+        file.mimetype.includes('excel') ||
+        file.originalname.match(/\.(xlsx|xls)$/i)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files (.xlsx, .xls) are allowed'), false);
+    }
+  }
+});
+// Add this route to your existing routes (after your current routes):
+
+// @route   POST /api/inventory/import-excel
+// @desc    Import inventory from Excel file
+// @access  Private
+router.post('/import-excel', upload.single('excelFile'), importInventoryExcel);
+
+// Error handling middleware for multer
+router.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'File too large',
+        details: 'File size must be less than 10MB'
+      });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        success: false,
+        message: 'Too many files',
+        details: 'Please upload only one file at a time'
+      });
+    }
+  }
+  
+  if (error.message.includes('Only Excel files')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid file type',
+      details: error.message
+    });
+  }
+  
+  next(error);
+});
+
 // Apply authentication middleware to all routes
 router.use(auth);
 

@@ -1,3 +1,4 @@
+//inventory controller
 const Inventory = require('../models/Inventory');
 const AuditLog = require('../models/AuditLog');
 
@@ -348,12 +349,136 @@ const getInventoryBySKU = async (req, res) => {
     });
   }
 };
+const ExcelImportService = require('../utils/excelImportService');
 
+/**
+ * Import inventory from Excel file
+ * @route POST /api/inventory/import-excel
+ * @access Private
+ */
+const importInventoryExcel = async (req, res) => {
+  try {
+    console.log('📥 Starting Excel import...');
+    
+    // Validate file upload
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No Excel file provided',
+        details: 'Please upload an Excel file (.xlsx, .xls)'
+      });
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'application/octet-stream' // Sometimes Excel files come as this
+    ];
+
+    if (!allowedTypes.includes(req.file.mimetype) && 
+        !req.file.originalname.match(/\.(xlsx|xls)$/i)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file type',
+        details: 'Please upload an Excel file (.xlsx or .xls)',
+        received: {
+          mimetype: req.file.mimetype,
+          filename: req.file.originalname
+        }
+      });
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (req.file.size > maxSize) {
+      return res.status(400).json({
+        success: false,
+        message: 'File too large',
+        details: `File size must be less than ${maxSize / 1024 / 1024}MB`,
+        received: `${(req.file.size / 1024 / 1024).toFixed(2)}MB`
+      });
+    }
+
+    console.log(`📁 Processing file: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)}KB)`);
+
+    // Initialize import service
+    // const importService = new ExcelImportService(req.user.id, req.user.username);
+    const importService = new ExcelImportService(
+  req.user?.id || 'system',
+  req.user?.username || 'system'
+);
+
+    // Process the Excel file
+    const results = await importService.importInventoryExcel(req.file.buffer);
+    
+    // Determine response status based on results
+    const hasErrors = results.errorCount > 0;
+    const hasCriticalErrors = results.errors.some(err => err.type === 'CRITICAL');
+    
+    let status = 200;
+    let success = true;
+    let message = 'Import completed successfully';
+
+    if (hasCriticalErrors) {
+      status = 400;
+      success = false;
+      message = 'Import failed due to critical errors';
+    } else if (hasErrors) {
+      status = 207; // Multi-status - partial success
+      success = true;
+      message = 'Import completed with some errors';
+    } else if (results.warnings.length > 0) {
+      message = 'Import completed with warnings';
+    }
+
+    // Response
+    res.status(status).json({
+      success,
+      message,
+      data: {
+        file: {
+          name: req.file.originalname,
+          size: req.file.size,
+          processedAt: new Date().toISOString()
+        },
+        results: {
+          summary: {
+            totalRows: results.totalRows,
+            processedRows: results.processedRows,
+            successCount: results.successCount,
+            errorCount: results.errorCount,
+            warningCount: results.warnings.length,
+            successRate: results.totalRows > 0 ? 
+              ((results.successCount / results.totalRows) * 100).toFixed(1) + '%' : '0%'
+          },
+          createdBins: results.createdBins,
+          itemsProcessed: results.summary,
+          errors: results.errors,
+          warnings: results.warnings
+        }
+      }
+    });
+
+    console.log(`✅ Import completed - ${results.successCount}/${results.totalRows} rows successful`);
+
+  } catch (error) {
+    console.error('❌ Import controller error:', error);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during import',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Import service unavailable',
+      details: 'Please try again or contact support if the problem persists'
+    });
+  }
+};
 module.exports = { 
   getInventory, 
   updateQuantity, 
   getInventoryStats, 
   getLowStock, 
   searchInventory,
-  getInventoryBySKU 
+  getInventoryBySKU,
+  importInventoryExcel
 };

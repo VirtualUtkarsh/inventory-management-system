@@ -36,37 +36,23 @@ const inventorySchema = new mongoose.Schema({
 inventorySchema.index({ skuId: 1, bin: 1 }, { unique: true });
 
 // Fixed static method for stock updates
-inventorySchema.statics.updateStock = async function(skuId, change, bin) {
-  // Find by BOTH skuId AND bin - this is the key fix
-  let item = await this.findOne({ skuId: skuId, bin: bin });
-  
-  if (item) {
-    // Update existing SKU+bin combination
-    item.quantity += change;
-    if (item.quantity < 0) {
-      throw new Error(`Insufficient stock in bin ${bin}. Available: ${item.quantity - change}, Requested: ${Math.abs(change)}`);
-    }
-    // If quantity becomes 0, we could optionally delete the record
-    // if (item.quantity === 0) {
-    //   await this.deleteOne({ _id: item._id });
-    //   return null;
-    // }
-  } else {
-    // Create new SKU+bin combination
-    if (change <= 0) {
-      throw new Error(`Cannot remove from non-existent item. SKU: ${skuId}, Bin: ${bin}`);
-    }
-    item = new this({ 
-      skuId: skuId,
-      quantity: change,
-      bin: bin
-    });
+inventorySchema.statics.updateStock = async function (skuId, change, bin) {
+  const item = await this.findOneAndUpdate(
+    { skuId, bin },
+    { 
+      $inc: { quantity: change }, 
+      $set: { lastUpdated: Date.now() } 
+    },
+    { new: true, upsert: true }
+  );
+
+  if (item.quantity < 0) {
+    throw new Error(`Insufficient stock in bin ${bin}. Current: ${item.quantity}, Change: ${change}`);
   }
-  
-  item.lastUpdated = Date.now();
-  await item.save();
+
   return item;
 };
+
 
 // Helper method to get total quantity across all bins for a SKU
 inventorySchema.statics.getTotalQuantityBySku = async function(skuId) {
