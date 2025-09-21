@@ -4,8 +4,9 @@ const router = express.Router();
 const { auth, requireAdmin } = require('../middleware/auth');
 const metadataController = require('../controllers/metadataController');
 
-// Public route to get all metadata for forms
+// Public routes (accessible to all authenticated users)
 router.get('/all', auth, metadataController.getAllMetadata);
+router.get('/bins', auth, metadataController.bins.getAll); // MOVED HERE - accessible to all users
 
 // Admin-only routes for managing metadata
 router.use(auth, requireAdmin); // All routes below require admin access
@@ -34,8 +35,7 @@ router.post('/categories', metadataController.categories.create);
 router.put('/categories/:id', metadataController.categories.update);
 router.delete('/categories/:id', metadataController.categories.delete);
 
-// Bins - NEW
-router.get('/bins', metadataController.bins.getAll);
+// Bins management (admin-only - for creating/updating/deleting bins)
 router.post('/bins', metadataController.bins.create);
 router.put('/bins/:id', metadataController.bins.update);
 router.delete('/bins/:id', metadataController.bins.delete);
