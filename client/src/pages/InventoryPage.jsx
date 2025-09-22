@@ -4,6 +4,19 @@ import axios from '../utils/axiosInstance';
 import { toast } from 'react-toastify';
 import InventoryTable from '../components/InventoryTable';
 import ExcelImport from '../components/ExcelImport';
+import { 
+  Search, 
+  Filter, 
+  Download, 
+  Upload, 
+  Printer, 
+  RefreshCw,
+  Package,
+  TrendingUp,
+  AlertTriangle,
+  Archive,
+  X
+} from 'lucide-react';
 import 'react-toastify/dist/ReactToastify.css';
 
 const InventoryPage = () => {
@@ -13,6 +26,7 @@ const InventoryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   
   // Refs to handle race conditions and cleanup
   const abortControllerRef = useRef(null);
@@ -332,216 +346,280 @@ const InventoryPage = () => {
   const lowStockCount = inventory.filter(item => item.quantity > 0 && item.quantity < 10).length;
   const outOfStockCount = inventory.filter(item => item.quantity === 0).length;
   const uniqueBins = new Set(inventory.map(item => item.bin).filter(Boolean)).size;
-  // const uniqueBaseSKUs = new Set(inventory.map(item => item.baseSku).filter(Boolean)).size;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Inventory Management</h1>
-          <p className="text-gray-600">Monitor and track your inventory across all variants</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Inventory Dashboard</h1>
+          <p className="mt-2 text-gray-600">Monitor and manage your inventory across all variants</p>
         </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          <div className="bg-blue-100 text-blue-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Total SKUs</h4>
-            <p className="text-2xl font-bold">{totalItems}</p>
-          </div>
+        
+        <div className="mt-4 lg:mt-0 flex flex-wrap gap-3">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Import Excel
+          </button>
           
-          <div className="bg-green-100 text-green-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Total Qty</h4>
-            <p className="text-2xl font-bold">{totalQuantity}</p>
-          </div>
+          <button
+            onClick={downloadCSV}
+            disabled={filteredInventory.length === 0}
+            className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </button>
           
-          <div className="bg-yellow-100 text-yellow-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Low Stock</h4>
-            <p className="text-2xl font-bold">{lowStockCount}</p>
-          </div>
-          
-          <div className="bg-red-100 text-red-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Out of Stock</h4>
-            <p className="text-2xl font-bold">{outOfStockCount}</p>
-          </div>
-          
-          {/* <div className="bg-purple-100 text-purple-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Base SKUs</h4>
-            <p className="text-2xl font-bold">{uniqueBaseSKUs}</p>
-          </div> */}
-          
-          <div className="bg-indigo-100 text-indigo-800 p-4 rounded-lg shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wide">Bins Used</h4>
-            <p className="text-2xl font-bold">{uniqueBins}</p>
-          </div>
+          <button
+            onClick={printTable}
+            disabled={filteredInventory.length === 0}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Printer className="w-4 h-4 mr-2" />
+            Print
+          </button>
         </div>
-
-        {/* Filters Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
-            <button
-              onClick={clearFilters}
-              className="text-sm text-blue-600 hover:text-blue-800 underline"
-            >
-              Clear All Filters
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search SKU</label>
-              <input
-                type="text"
-                name="search"
-                value={filters.search}
-                onChange={handleFilterChange}
-                placeholder="Search..."
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bin Location</label>
-              <input
-                type="text"
-                name="bin"
-                value={filters.bin}
-                onChange={handleFilterChange}
-                placeholder="Filter by bin..."
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-              <input
-                type="date"
-                name="fromDate"
-                value={filters.fromDate}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-              <input
-                type="date"
-                name="toDate"
-                value={filters.toDate}
-                onChange={handleFilterChange}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Quick Filters */}
-          <div className="mt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Quick Filters</h4>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="lowStock"
-                  checked={filters.lowStock}
-                  onChange={handleFilterChange}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
-                />
-                <span className="text-sm text-gray-700">Low Stock (&lt; 10)</span>
-              </label>
-
-              <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-md hover:bg-gray-100 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="outOfStock"
-                  checked={filters.outOfStock}
-                  onChange={handleFilterChange}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
-                />
-                <span className="text-sm text-gray-700">Out of Stock</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Results Summary and Actions */}
-        <div className="flex justify-between items-center mb-4">
-          <p className="text-sm text-gray-600">
-            Showing {filteredInventory.length} of {totalItems} inventory items
-            {loading && <span className="ml-2 text-blue-600">(Updating...)</span>}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md transition-colors flex items-center gap-2"
-              title="Import inventory from Excel"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Import Excel
-            </button>
-            
-            <button
-              onClick={downloadCSV}
-              disabled={filteredInventory.length === 0}
-              className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors flex items-center gap-1"
-              title="Download filtered data as CSV"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              CSV
-            </button>
-            
-            <button
-              onClick={printTable}
-              disabled={filteredInventory.length === 0}
-              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors flex items-center gap-1"
-              title="Print filtered data"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              Print
-            </button>
-          </div>
-        </div>
-
-        {/* Table or Error States */}
-        {loading && inventory.length === 0 ? (
-          <div className="text-center py-8 text-gray-600">Loading inventory...</div>
-        ) : error ? (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded mb-4">
-            {error}
-            <button 
-              onClick={throttledRefresh}
-              className="ml-4 text-sm underline hover:text-red-800"
-            >
-              Try Again
-            </button>
-          </div>
-        ) : inventory.length === 0 ? (
-          <div className="text-center text-gray-500 py-12">
-            <p className="text-lg mb-2">No inventory records found</p>
-            <p className="text-sm">Add some inbound items or import from Excel to populate your inventory</p>
-          </div>
-        ) : (
-          <InventoryTable 
-            inventory={filteredInventory} 
-            onRefresh={throttledRefresh}
-          />
-        )}
-
-        {/* Excel Import Modal */}
-        {showImportModal && (
-          <ExcelImport
-            onClose={() => setShowImportModal(false)}
-            onImportComplete={handleImportComplete}
-          />
-        )}
       </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Package className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total SKUs</p>
+              <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Qty</p>
+              <p className="text-2xl font-bold text-gray-900">{totalQuantity}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <AlertTriangle className="w-6 h-6 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Low Stock</p>
+              <p className="text-2xl font-bold text-gray-900">{lowStockCount}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Out of Stock</p>
+              <p className="text-2xl font-bold text-gray-900">{outOfStockCount}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <Archive className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Bins Used</p>
+              <p className="text-2xl font-bold text-gray-900">{uniqueBins}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            {/* Search */}
+            <div className="flex-1 max-w-lg">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  name="search"
+                  value={filters.search}
+                  onChange={handleFilterChange}
+                  placeholder="Search SKU or name..."
+                  className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            
+            {/* Filter Toggle & Actions */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                  showFilters 
+                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Filters
+              </button>
+              
+              <button
+                onClick={throttledRefresh}
+                disabled={loading}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* Expanded Filters */}
+          {showFilters && (
+            <div className="mt-6 pt-6 border-t border-gray-200 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium text-gray-900">Advanced Filters</h3>
+                <button
+                  onClick={clearFilters}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Clear All
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bin Location</label>
+                  <input
+                    type="text"
+                    name="bin"
+                    value={filters.bin}
+                    onChange={handleFilterChange}
+                    placeholder="Filter by bin..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                  <input
+                    type="date"
+                    name="fromDate"
+                    value={filters.fromDate}
+                    onChange={handleFilterChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                  <input
+                    type="date"
+                    name="toDate"
+                    value={filters.toDate}
+                    onChange={handleFilterChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Filters */}
+              <div className="flex flex-wrap gap-4 pt-4">
+                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="lowStock"
+                    checked={filters.lowStock}
+                    onChange={handleFilterChange}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Low Stock (&lt; 10)</span>
+                </label>
+
+                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="outOfStock"
+                    checked={filters.outOfStock}
+                    onChange={handleFilterChange}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Out of Stock</span>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Results Summary */}
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-gray-600">
+          Showing {filteredInventory.length} of {totalItems} inventory items
+          {loading && <span className="ml-2 text-blue-600">(Updating...)</span>}
+        </p>
+      </div>
+
+      {/* Table or Error States */}
+      {loading && inventory.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <RefreshCw className="w-8 h-8 text-gray-400 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Loading inventory...</p>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <div className="flex items-center space-x-3">
+            <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Error Loading Inventory</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <button 
+                onClick={throttledRefresh}
+                className="mt-3 text-sm text-red-700 underline hover:text-red-800"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : inventory.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No inventory records found</h3>
+          <p className="text-gray-500">Add some inbound items or import from Excel to populate your inventory</p>
+        </div>
+      ) : (
+        <InventoryTable 
+          inventory={filteredInventory} 
+          onRefresh={throttledRefresh}
+        />
+      )}
+
+      {/* Excel Import Modal */}
+      {showImportModal && (
+        <ExcelImport
+          onClose={() => setShowImportModal(false)}
+          onImportComplete={handleImportComplete}
+        />
+      )}
     </div>
   );
 };
