@@ -1,32 +1,33 @@
+// server/models/Inset.js
 const mongoose = require('mongoose');
-const Inventory = require('./Inventory'); // Required to access updateStock()
+const Inventory = require('./Inventory');
 
 const insetSchema = new mongoose.Schema({
-  sku: {
+  // Manual SKU ID input field (complete SKU entered by user)
+  skuId: {
     type: String,
-    required: true,
-    trim: true
+    required: [true, 'SKU ID is required'],
+    unique: true,
+    trim: true,
+    uppercase: true
   },
-  name: {
-    type: String,
-    required: [true, 'Name is required'],
-    trim: true
-  },
-  orderNo: {
-    type: String,
-    required: true,
-    trim: true
-  },
+  
+  // bin: {
+  //   type: String,
+  //   required: true,
+  //   trim: true
+  // },
   bin: {
     type: String,
-    required: true,
-    trim: true
+    ref: 'Bin',
+    required: true
   },
   quantity: {
     type: Number,
     required: true,
     min: 1
   },
+  
   user: {
     id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -40,11 +41,11 @@ const insetSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// // 📦 Automatically update inventory after inset is saved
+// Update inventory after inset is saved (uncomment if needed)
 // insetSchema.post('save', async function (doc, next) {
 //   try {
-//     await Inventory.updateStock(doc.sku, doc.quantity, doc.bin);
-//     console.log('✅ Inventory increased for SKU:', doc.sku);
+//     await Inventory.updateStock(doc.skuId, doc.quantity, doc.bin);
+//     console.log('✅ Inventory increased for SKU_ID:', doc.skuId);
 //     next();
 //   } catch (error) {
 //     console.error('❌ Failed to update inventory:', error.message);

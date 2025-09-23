@@ -1,28 +1,26 @@
+// server/models/Inventory.js
 const mongoose = require('mongoose');
 
 const inventorySchema = new mongoose.Schema({
-  sku: {
+  // SKU_ID (from inset/outset)
+  skuId: {
     type: String,
     required: true,
-    unique: true
+    trim: true
+    // REMOVED unique: true - this was the problem!
   },
-  name: {
-    type: String,
-    required: true,
-    default: function() {
-      return `Item ${this.sku}`; // Auto-generate name if not provided
-    }
-  },
+  
   quantity: {
     type: Number,
     required: true,
     min: 0
   },
+  
   bin: {
     type: String,
-    required: true,
-    default: 'DEFAULT'
+    required: true
   },
+  
   lastUpdated: {
     type: Date,
     default: Date.now
@@ -33,28 +31,43 @@ const inventorySchema = new mongoose.Schema({
   toObject: { virtuals: true } 
 });
 
-// Static method for stock updates
-inventorySchema.statics.updateStock = async function(sku, change, bin, name) {
-  let item = await this.findOne({ sku });
+// COMPOUND UNIQUE INDEX - This ensures same SKU can exist in different bins
+// but prevents duplicate SKU+bin combinations
+inventorySchema.index({ skuId: 1, bin: 1 }, { unique: true });
 
-  if (item) {
-    item.quantity += change;
-    if (item.quantity < 0) throw new Error('Insufficient stock');
-    if (bin) item.bin = bin;
-    if (name) item.name = name;
-  } else {
-    if (change <= 0) throw new Error('Cannot remove non-existent item');
-    item = new this({ 
-      sku,
-      name: name || `Item ${sku}`,
-      quantity: change,
-      bin: bin || 'DEFAULT'
-    });
+// Fixed static method for stock updates
+inventorySchema.statics.updateStock = async function (skuId, change, bin) {
+  const item = await this.findOneAndUpdate(
+    { skuId, bin },
+    { 
+      $inc: { quantity: change }, 
+      $set: { lastUpdated: Date.now() } 
+    },
+    { new: true, upsert: true }
+  );
+
+  if (item.quantity < 0) {
+    throw new Error(`Insufficient stock in bin ${bin}. Current: ${item.quantity}, Change: ${change}`);
   }
 
-  item.lastUpdated = Date.now();
-  await item.save();
   return item;
+};
+
+
+// Helper method to get total quantity across all bins for a SKU
+inventorySchema.statics.getTotalQuantityBySku = async function(skuId) {
+  const items = await this.find({ skuId: skuId });
+  return items.reduce((total, item) => total + item.quantity, 0);
+};
+
+// Helper method to get all bins for a specific SKU
+inventorySchema.statics.getBinsBySku = async function(skuId) {
+  const items = await this.find({ skuId: skuId, quantity: { $gt: 0 } });
+  return items.map(item => ({
+    bin: item.bin,
+    quantity: item.quantity,
+    _id: item._id
+  }));
 };
 
 module.exports = mongoose.model('Inventory', inventorySchema);

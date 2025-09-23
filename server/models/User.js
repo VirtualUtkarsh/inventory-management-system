@@ -20,7 +20,18 @@ const UserSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  status: {
+  type: String,
+  enum: ['pending', 'approved', 'rejected'],
+  default: 'pending'
+},
+role: {
+  type: String,
+  enum: ['user', 'admin'],
+  default: 'user'
+}
+
 })
 
 // Hash password before saving (only if password is modified)

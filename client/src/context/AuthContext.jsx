@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import axios from 'axios';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import axiosInstance from '../utils/axiosInstance';
 import jwt_decode from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,69 +8,118 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Set the base URL for axios (no trailing slash)
-  axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  // Memoize logout function to prevent unnecessary re-renders
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
+    navigate('/login');
+  }, [navigate]);
 
-  // Login function
   const login = async (email, password) => {
     try {
-      const { data } = await axios.post('/api/auth/login', { email, password });
+      console.log('🔐 Attempting login with axiosInstance...');
+      const { data } = await axiosInstance.post('/api/auth/login', { email, password });
       localStorage.setItem('token', data.token);
       setToken(data.token);
       setUser(data.user);
-      navigate('/inventory');
+      
+      // Navigate based on user role
+      if (data.user?.role === 'admin') {
+        console.log('🔍 Navigating admin to /admin');
+        navigate('/admin');
+      } else {
+        console.log('🔍 Navigating regular user to /inventory');
+        navigate('/inventory');
+      }
     } catch (error) {
       console.error('Login error:', error);
       throw error.response?.data || error.message;
     }
   };
 
-  // Register function
   const register = async (name, email, password) => {
     try {
-      console.log('AuthContext register called with:', { name, email });
-      const { data } = await axios.post('/api/auth/register', { name, email, password });
-      console.log('AuthContext register successful:', data);
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
-      setUser(data.user);
-      navigate('/inventory');
+      console.log('📝 Attempting register with axiosInstance...');
+      const { data } = await axiosInstance.post('/api/auth/register', { name, email, password });
+      
+      // Note: After registration, users are pending approval
+      // Don't set token/user or navigate - show success message instead
+      return {
+        success: true,
+        message: data.message || 'Registration successful. Awaiting admin approval.'
+      };
     } catch (error) {
       console.error('Register error:', error);
       throw error.response?.data || error.message;
     }
   };
 
-  // Logout function
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
-    navigate('/login');
+  // Check if user is admin
+  const isAdmin = () => {
+    return user && user.role === 'admin';
   };
 
-  // Effect to decode token and set user
+  // Check if user is approved
+  const isApproved = () => {
+    return user && user.status === 'approved';
+  };
+
   useEffect(() => {
-    if (token) {
+    const initializeAuth = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const decoded = jwt_decode(token);
         if (decoded.exp * 1000 < Date.now()) {
-          logout(); // Token expired
+          logout();
         } else {
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          setUser(decoded);
+          // Always try to fetch user data if we don't have it
+          if (!user) {
+            console.log('🔍 Fetching user from /api/auth/me');
+            try {
+              const res = await axiosInstance.get('/api/auth/me');
+              console.log('🔍 /api/auth/me response:', res.data);
+              setUser(res.data.user);
+            } catch (error) {
+              console.error('🔍 /api/auth/me failed:', error);
+              // If /me route fails, logout to be safe
+              logout();
+            }
+          }
         }
       } catch (error) {
-        console.error('Token decode error:', error);
+        console.error('Token decode or /me fetch error:', error);
         logout();
+      } finally {
+        console.log('🔍 Setting loading to false');
+        setLoading(false);
       }
-    }
-  }, [token]);
+    };
+
+    initializeAuth();
+  }, [token, user, logout]); // Now includes logout in dependencies
+
+  // DEBUG: Log current state
+  console.log('🔍 AuthContext state:', { user: user?.role, token: !!token, loading });
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      loading,
+      login,
+      register,
+      logout,
+      isAdmin,
+      isApproved
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { auth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { check, validationResult } = require('express-validator');
@@ -22,26 +23,28 @@ router.post('/register', [
   const { name, email, password } = req.body;
 
   try {
-    // Check if user exists
+    // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Create new user (password hashed via pre-save middleware)
-    user = new User({ name, email, password });
+    // Create new user with default status and role
+    user = new User({ name, email, password, status: 'pending', role: 'user' });
     await user.save();
 
-    // Create JWT
+    // JWT (optional for login after approval — could skip for now)
     const payload = { id: user.id };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.status(201).json({
-      token,
+      message: 'Registration successful. Awaiting admin approval.',
       user: {
         id: user.id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        status: user.status,
+        role: user.role
       }
     });
 
@@ -57,41 +60,85 @@ router.post('/login', [
   check('email', 'Please include a valid email').isEmail(),
   check('password', 'Password is required').exists()
 ], async (req, res) => {
+  // DEBUG: Log the incoming request
+  console.log('=== LOGIN REQUEST DEBUG ===');
+  console.log('Request body:', req.body);
+  console.log('Request headers:', req.headers);
+  console.log('Content-Type:', req.headers['content-type']);
+  
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log('Validation errors:', errors.array());
     return res.status(400).json({ message: errors.array()[0].msg });
   }
 
   const { email, password } = req.body;
+  console.log('Extracted email:', email);
+  console.log('Extracted password length:', password ? password.length : 'undefined');
 
   try {
     // Find user and include password field
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
+      console.log('User not found for email:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+
+    console.log('User found:', { id: user._id, email: user.email, role: user.role, status: user.status });
 
     // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.log('Password mismatch for user:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    if (user.status !== 'approved') {
+      console.log('User not approved:', { email, status: user.status });
+      return res.status(403).json({ message: 'Your account is not yet approved.' });
     }
 
     // Create JWT
     const payload = { id: user.id };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
+    const responseUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status
+    };
+
+    console.log('Login successful for:', email);
+
     res.json({
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
+      user: responseUser
     });
 
   } catch (err) {
-    console.error(err.message);
+    console.error('Login error:', err.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/auth/me
+// @desc    Get current user info
+// @access  Private
+router.get('/me', auth, async (req, res) => {
+  try {
+    res.json({
+      user: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        status: req.user.status,
+        role: req.user.role
+      }
+    });
+  } catch (err) {
+    console.error('Error in /me route:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });

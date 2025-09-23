@@ -22,7 +22,16 @@ const register = async (req, res) => {
     const payload = { id: user._id };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email } });
+    res.status(201).json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status
+      }
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -46,7 +55,17 @@ const login = async (req, res) => {
     const payload = { id: user._id };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
+    const responseUser = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status
+    };
+    res.json({
+      token,
+      user: responseUser
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');

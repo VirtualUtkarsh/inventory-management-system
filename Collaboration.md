@@ -74,6 +74,7 @@ Then your pull request code will be reviewed and then merged if approved by at l
 
 ## 🧠 Need Help?
 
+<<<<<<< HEAD
 Checkout the resources and documentations: https://chatgpt.com/share/68c2923c-ca64-800c-ac0f-3fb06fd39d76
 
 ![image](https://github.com/user-attachments/assets/ab9d3919-69de-4177-af33-40f453d9e005)
@@ -83,3 +84,9 @@ Checkout the resources and documentations: https://chatgpt.com/share/68c2923c-ca
 
 
 
+=======
+Try GPT 
+![image](https://github.com/user-attachments/assets/ab9d3919-69de-4177-af33-40f453d9e005)
+
+
+>>>>>>> c2d2180bc27d20c9c613aff0dba9a3ab004bcaa5
