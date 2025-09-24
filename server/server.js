@@ -11,6 +11,8 @@ const insetRoutes = require('./routes/insets');
 const inventoryRoutes = require('./routes/inventory');
 const metadataRoutes = require('./routes/metadata');
 const cleanupService = require('./utils/cleanupService');
+// Add this import for admin bootstrap
+const { checkAndCreateAdmin } = require('./utils/adminBootstrap');
 
 // Load environment variables
 dotenv.config();
@@ -77,23 +79,35 @@ app.use((err, req, res, next) => {
 });
 
 // ====================
-// Database & Server
+// Database & Server Startup
 // ====================
 
-connectDB()
-  .then(() => {
+async function startServer() {
+  try {
+    // Connect to database
+    await connectDB();
+    
+    // Check and create admin user if needed
+    await checkAndCreateAdmin();
+    
+    // Start cleanup service
     cleanupService.start();
 
+    // Start the server
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌐 Local: http://localhost:${PORT}`);
     });
-  })
-  .catch(error => {
-    console.error('❌ Database connection failed:', error);
+    
+  } catch (error) {
+    console.error('❌ Server startup failed:', error);
     process.exit(1);
-  });
+  }
+}
+
+// Start the server
+startServer();
 
 // ====================
 // Graceful Shutdown
