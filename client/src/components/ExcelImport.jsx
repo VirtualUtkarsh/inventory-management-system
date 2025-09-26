@@ -30,8 +30,8 @@ const ExcelImport = ({
         title: 'Import Inbound Records from Excel',
         requirements: [
           'SKU: Product SKU identifier (e.g., "BOYTRACK", "FHST01")',
-          'BIN NO./BIN LOCATION: Single bin location (e.g., "ST-022-005-003")',
-          'QUANTITY/BALANCE: Quantity to add to inbound',
+          'BIN : Single bin location (e.g., "ST-022-005-003")',
+          'QUANTITY: Quantity to add to inbound',
           'Headers can be in any order, but names should contain these keywords',
           'Current user will be automatically assigned to each record',
           'Date/time will be automatically set to current time',
@@ -41,11 +41,11 @@ const ExcelImport = ({
       return {
         title: 'Import Inventory from Excel',
         requirements: [
-          'SKU: Product SKU identifier (e.g., "BOYTRACK", "FHST01")',
-          'BIN NO.: Comma-separated bin locations (e.g., "ST-022-005-003,ST-020-008-004")',
-          'SUM of BALANCE: Total quantity to distribute across bins',
+         'SKU: Product SKU identifier (e.g., "BOYTRACK", "FHST01")',
+          'BIN : Single bin location (e.g., "ST-022-005-003")',
+          'QUANTITY: Quantity to add to inbound',
           'Headers can be in any order, but names should contain these keywords',
-          'Quantity will be split equally across multiple bins',
+          // 'Quantity will be split equally across multiple bins',
           'New bins will be created automatically if they don\'t exist',
         ],
       };

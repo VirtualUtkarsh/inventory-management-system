@@ -53,7 +53,8 @@ const getApiBaseUrl = () => {
   return productionFallback;
 };
 
-const baseURL = getApiBaseUrl();
+// const baseURL = getApiBaseUrl();
+const baseURL = process.env.NODE_ENV === 'development' ? '' : getApiBaseUrl();
 console.log('🔧 Final Axios Base URL:', baseURL);
 
 // ✅ Create axios instance

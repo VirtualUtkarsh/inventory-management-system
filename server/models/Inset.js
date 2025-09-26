@@ -7,7 +7,7 @@ const insetSchema = new mongoose.Schema({
   skuId: {
     type: String,
     required: [true, 'SKU ID is required'],
-    unique: true,
+    // unique: true,
     trim: true,
     uppercase: true
   },
