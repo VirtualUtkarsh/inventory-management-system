@@ -53,7 +53,7 @@ app.use(morgan('dev'));
 
 app.use('/api/admin', adminRoutes);
 app.use('/api', apiRoutes);
-app.use('/api/outset', outsetRoutes);
+app.use('/api/outsets', outsetRoutes);
 app.use('/api/insets', insetRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/metadata', metadataRoutes);

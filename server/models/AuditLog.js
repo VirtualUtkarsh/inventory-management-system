@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 
-const actionTypes = ['CREATE', 'UPDATE', 'DELETE', 'STOCK_DECREASE'];  // Added 'STOCK_DECREASE'
+const actionTypes = ['CREATE', 'UPDATE', 'DELETE', 'STOCK_DECREASE','BATCH_STOCK_DECREASE'];  // Added 'STOCK_DECREASE'
 const collectionNames = ['Inventory', 'Inset', 'Outset'];
 
 const auditLogSchema = new mongoose.Schema({
   actionType: {
     type: String,
-    required: true,
+    required: true  ,
     enum: actionTypes
   },
   collectionName: {

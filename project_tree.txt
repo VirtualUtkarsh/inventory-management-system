@@ -1,114 +1,138 @@
-InventorymgmtV1/
-├─ client/
-│  ├─ config/
-│  │  ├─ jest/
-│  │  │  ├─ babelTransform.js
-│  │  │  ├─ cssTransform.js
-│  │  │  └─ fileTransform.js
-│  │  ├─ webpack/
-│  │  │  └─ persistentCache/
-│  │  │     └─ createEnvironmentHash.js
-│  │  ├─ env.js
-│  │  ├─ getHttpsConfig.js
-│  │  ├─ modules.js
-│  │  ├─ paths.js
-│  │  ├─ webpack.config.js
-│  │  └─ webpackDevServer.config.js
-│  ├─ public/
-│  │  ├─ favicon.ico
-│  │  ├─ index.html
-│  │  ├─ logo192.png
-│  │  ├─ logo512.png
-│  │  ├─ manifest.json
-│  │  └─ robots.txt
-│  ├─ scripts/
-│  │  ├─ build.js
-│  │  ├─ start.js
-│  │  └─ test.js
-│  ├─ src/
-│  │  ├─ components/
-│  │  │  ├─ ExcelImport.jsx
-│  │  │  ├─ InventoryTable.jsx
-│  │  │  ├─ Layout.jsx
-│  │  │  ├─ Navigation.jsx
-│  │  │  ├─ PrivateRoute.jsx
-│  │  │  └─ TableFilter.jsx
-│  │  ├─ context/
-│  │  │  └─ AuthContext.jsx
-│  │  ├─ hooks/
-│  │  │  └─ useTableFilter.js
-│  │  ├─ pages/
-│  │  │  ├─ AdminDashboard.jsx
-│  │  │  ├─ InsetPage.jsx
-│  │  │  ├─ InventoryPage.jsx
-│  │  │  ├─ LoginPage.jsx
-│  │  │  ├─ OutsetPage.jsx
-│  │  │  └─ RegisterPage.jsx
-│  │  ├─ utils/
-│  │  │  └─ axiosInstance.js
-│  │  ├─ App.css
-│  │  ├─ App.jsx
-│  │  ├─ App.test.js
-│  │  ├─ index.css
-│  │  ├─ index.js
-│  │  ├─ logo.svg
-│  │  ├─ reportWebVitals.js
-│  │  └─ setupTests.js
-│  ├─ .env
-│  ├─ .env..production
-│  ├─ .env.development
-│  ├─ package.json
-│  ├─ package-lock.json
-│  ├─ README.md
-│  └─ tailwind.config.js
-├─ server/
-│  ├─ config/
-│  │  └─ db.js
-│  ├─ controllers/
-│  │  ├─ adminController.js
-│  │  ├─ insetController.js
-│  │  ├─ inventoryController.js
-│  │  ├─ metadataController.js
-│  │  ├─ outsetController.js
-│  │  └─ userController.js
-│  ├─ fixtries/
-│  │  ├─ checkAdmin.js
-│  │  └─ fixAdmin.js
-│  ├─ middleware/
-│  │  └─ auth.js
-│  ├─ models/
-│  │  ├─ AuditLog.js
-│  │  ├─ bin.js
-│  │  ├─ CleanupLog.js
-│  │  ├─ Color.js
-│  │  ├─ Inset.js
-│  │  ├─ Inventory.js
-│  │  ├─ Outset.js
-│  │  ├─ Pack.js
-│  │  ├─ ProductCategory.js
-│  │  ├─ ProductSize.js
-│  │  └─ User.js
-│  ├─ routes/
-│  │  ├─ admin.js
-│  │  ├─ api.js
-│  │  ├─ auth.js
-│  │  ├─ insets.js
-│  │  ├─ inventory.js
-│  │  ├─ metadata.js
-│  │  └─ outset.js
-│  ├─ utils/
-│  │  ├─ cleanupService.js
-│  │  ├─ excelImportService.js
-│  │  └─ InboundExcelImportService.js
-│  ├─ .env
-│  ├─ bootstrap-admin.js
-│  ├─ diagnose-database.js
-│  ├─ package.json
-│  ├─ package-lock.json
-│  ├─ seedAdmin.js
-│  └─ server.js
-├─ .gitignore
-├─ Collaboration.md
-├─ package.json
-├─ project_tree.txt
-└─ RunProject_README.md
+InventorymgmtV1
+├── .gitignore
+├── Collaboration.md
+├── package.json
+├── project_tree.txt
+├── RunProject_README.md
+├── client
+│   ├── .env
+│   ├── .env..production
+│   ├── .env.development
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── README.md
+│   ├── tailwind.config.js
+│   ├── build
+│   │   ├── asset-manifest.json
+│   │   ├── favicon.ico
+│   │   ├── index.html
+│   │   ├── logo192.png
+│   │   ├── logo512.png
+│   │   ├── manifest.json
+│   │   ├── robots.txt
+│   │   └── static
+│   │       ├── css
+│   │       │   ├── main.db000074.css
+│   │       │   └── main.db000074.css.map
+│   │       └── js
+│   │           ├── 453.a3c1d153.chunk.js
+│   │           ├── 453.a3c1d153.chunk.js.map
+│   │           ├── main.1385efbd.js
+│   │           ├── main.1385efbd.js.LICENSE.txt
+│   │           └── main.1385efbd.js.map
+│   ├── config
+│   │   ├── env.js
+│   │   ├── getHttpsConfig.js
+│   │   ├── modules.js
+│   │   ├── paths.js
+│   │   ├── webpack.config.js
+│   │   ├── webpackDevServer.config.js
+│   │   ├── jest
+│   │   │   ├── babelTransform.js
+│   │   │   ├── cssTransform.js
+│   │   │   └── fileTransform.js
+│   │   └── webpack
+│   │       └── persistentCache
+│   │           └── createEnvironmentHash.js
+│   ├── public
+│   │   ├── favicon.ico
+│   │   ├── index.html
+│   │   ├── logo192.png
+│   │   ├── logo512.png
+│   │   ├── manifest.json
+│   │   └── robots.txt
+│   ├── scripts
+│   │   ├── build.js
+│   │   ├── start.js
+│   │   └── test.js
+│   └── src
+│       ├── App.css
+│       ├── App.jsx
+│       ├── App.test.js
+│       ├── index.css
+│       ├── index.js
+│       ├── logo.svg
+│       ├── reportWebVitals.js
+│       ├── setupTests.js
+│       ├── components
+│       │   ├── ExcelImport.jsx
+│       │   ├── InventoryTable.jsx
+│       │   ├── Layout.jsx
+│       │   ├── Navigation.jsx
+│       │   ├── OutboundCart.jsx
+│       │   ├── OutboundHistoryTable.jsx
+│       │   ├── PrivateRoute.jsx
+│       │   ├── ProductSelector.jsx
+│       │   └── TableFilter.jsx
+│       ├── context
+│       │   └── AuthContext.jsx
+│       ├── hooks
+│       │   ├── useOutboundCart.js
+│       │   └── useTableFilter.js
+│       ├── pages
+│       │   ├── AdminDashboard.jsx
+│       │   ├── InsetPage.jsx
+│       │   ├── InventoryPage.jsx
+│       │   ├── LoginPage.jsx
+│       │   ├── OutsetPage.jsx
+│       │   └── RegisterPage.jsx
+│       └── utils
+│           └── axiosInstance.js
+└── server
+    ├── .env
+    ├── bootstrap-admin.js
+    ├── diagnose-database.js
+    ├── package-lock.json
+    ├── package.json
+    ├── seedAdmin.js
+    ├── server.js
+    ├── config
+    │   └── db.js
+    ├── controllers
+    │   ├── adminController.js
+    │   ├── insetController.js
+    │   ├── inventoryController.js
+    │   ├── metadataController.js
+    │   ├── outsetController.js
+    │   └── userController.js
+    ├── fixtries
+    │   ├── checkAdmin.js
+    │   ├── drop-unique-index.js
+    │   └── fixAdmin.js
+    ├── middleware
+    │   └── auth.js
+    ├── models
+    │   ├── AuditLog.js
+    │   ├── bin.js
+    │   ├── CleanupLog.js
+    │   ├── Color.js
+    │   ├── Inset.js
+    │   ├── Inventory.js
+    │   ├── Outset.js
+    │   ├── Pack.js
+    │   ├── ProductCategory.js
+    │   ├── ProductSize.js
+    │   └── User.js
+    ├── routes
+    │   ├── admin.js
+    │   ├── api.js
+    │   ├── auth.js
+    │   ├── insets.js
+    │   ├── inventory.js
+    │   ├── metadata.js
+    │   └── outset.js
+    └── utils
+        ├── adminBootstrap.js
+        ├── cleanupService.js
+        ├── excelImportService.js
+        └── InboundExcelImportService.js

@@ -149,10 +149,6 @@ const InventoryPage = () => {
 
     const headers = [
       'SKU ID',
-      'Base SKU',
-      'Name',
-      'Size',
-      'Category',
       'Bin',
       'Quantity',
       'Last Updated'
@@ -160,10 +156,6 @@ const InventoryPage = () => {
 
     const csvData = filteredInventory.map(item => [
       item.skuId || 'N/A',
-      item.baseSku || '',
-      item.name || '',
-      item.size || '',
-      item.category || '',
       item.bin || '',
       item.quantity || 0,
       item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : new Date(item.createdAt).toLocaleDateString()
