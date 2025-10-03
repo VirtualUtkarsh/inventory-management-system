@@ -1,11 +1,11 @@
 // client/src/hooks/useOutboundCart.js
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 
 export const useOutboundCart = () => {
   const [cartItems, setCartItems] = useState([]);
 
-  const addToCart = (product, quantity = 1) => {
+  const addToCart = useCallback((product, quantity = 1) => {
     const cartKey = `${product.skuId}-${product.bin}`;
     
     setCartItems(prev => {
@@ -14,21 +14,30 @@ export const useOutboundCart = () => {
       );
 
       if (existingIndex >= 0) {
-        const updatedItems = [...prev];
-        const newQuantity = updatedItems[existingIndex].quantity + quantity;
+        // Item already in cart - update quantity
+        const existingItem = prev[existingIndex];
+        const newQuantity = existingItem.quantity + quantity;
         
-        if (newQuantity > product.quantity) {
-          toast.error(`Cannot add more than ${product.quantity} items from bin ${product.bin}`);
-          return prev;
+        // Check against original product quantity
+        if (newQuantity > existingItem.availableQuantity) {
+          toast.error(`Cannot add more than ${existingItem.availableQuantity} items from bin ${product.bin}`);
+          return prev; // Return unchanged state
         }
         
-        updatedItems[existingIndex].quantity = newQuantity;
-        toast.success(`Updated ${product.skuId} quantity in cart`);
+        // Create new array with updated item
+        const updatedItems = [...prev];
+        updatedItems[existingIndex] = {
+          ...existingItem,
+          quantity: newQuantity
+        };
+        
+        toast.success(`Updated ${product.skuId} quantity to ${newQuantity} in cart`);
         return updatedItems;
       } else {
+        // New item - add to cart
         if (quantity > product.quantity) {
           toast.error(`Cannot add more than ${product.quantity} items from bin ${product.bin}`);
-          return prev;
+          return prev; // Return unchanged state
         }
         
         const newItem = {
@@ -41,18 +50,18 @@ export const useOutboundCart = () => {
           product: product
         };
         
-        toast.success(`Added ${product.skuId} to cart`);
+        toast.success(`Added ${product.skuId} (${quantity}) to cart`);
         return [...prev, newItem];
       }
     });
-  };
+  }, []);
 
-  const removeFromCart = (cartId) => {
+  const removeFromCart = useCallback((cartId) => {
     setCartItems(prev => prev.filter(item => item.id !== cartId));
     toast.success('Item removed from cart');
-  };
+  }, []);
 
-  const updateQuantity = (cartId, newQuantity) => {
+  const updateQuantity = useCallback((cartId, newQuantity) => {
     setCartItems(prev => prev.map(item => {
       if (item.id === cartId) {
         if (newQuantity > item.availableQuantity) {
@@ -67,20 +76,20 @@ export const useOutboundCart = () => {
       }
       return item;
     }));
-  };
+  }, []);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCartItems([]);
     toast.success('Cart cleared');
-  };
+  }, []);
 
-  const getCartSummary = () => {
+  const getCartSummary = useCallback(() => {
     const totalItems = cartItems.length;
     const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const uniqueSkus = [...new Set(cartItems.map(item => item.skuId))].length;
     
     return { totalItems, totalQuantity, uniqueSkus };
-  };
+  }, [cartItems]);
 
   return {
     cartItems,

@@ -719,22 +719,18 @@ const InsetPage = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Bin Location</label>
-                  <select
-                    name="bin"
-                    value={filters.bin}
-                    onChange={handleFilterChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Bins</option>
-                    {getUniqueBins().map(bin => (
-                      <option key={bin} value={bin}>{bin}</option>
-                    ))}
-                  </select>
-                </div>
-
+{/* Bin Filter - Search input */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">Bin Location</label>
+  <input
+    type="text"
+    name="bin"
+    value={filters.bin}
+    onChange={handleFilterChange}
+    placeholder="Search bin location..."
+    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+  />
+</div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Added By</label>
                   <input

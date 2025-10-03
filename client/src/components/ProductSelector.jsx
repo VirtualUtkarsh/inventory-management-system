@@ -5,11 +5,14 @@ import {
   MapPin,
   Plus,
   X,
-  RefreshCw
+  RefreshCw,
+  Check,
+  ShoppingCart
 } from 'lucide-react';
 
 const ProductSelector = ({ 
   inventory, 
+  cartItems = [],
   onAddToCart, 
   onClose, 
   loading = false 
@@ -18,6 +21,12 @@ const ProductSelector = ({
 
   const getDisplaySku = (item) => {
     return item.skuId || item.sku || 'N/A';
+  };
+
+  const getQuantityInCart = (product) => {
+    const cartKey = `${product.skuId}-${product.bin}`;
+    const cartItem = cartItems.find(item => `${item.skuId}-${item.bin}` === cartKey);
+    return cartItem ? cartItem.quantity : 0;
   };
 
   const getGroupedInventory = () => {
@@ -138,6 +147,7 @@ const ProductSelector = ({
                         <ProductBinCard
                           key={product._id}
                           product={product}
+                          quantityInCart={getQuantityInCart(product)}
                           onAddToCart={handleAddToCart}
                         />
                       ))}
@@ -168,27 +178,41 @@ const ProductSelector = ({
   );
 };
 
-const ProductBinCard = ({ product, onAddToCart }) => {
+const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
+
+  const remainingQuantity = product.quantity - quantityInCart;
+  const isFullyInCart = remainingQuantity <= 0;
 
   const handleAdd = async () => {
     setIsAdding(true);
     try {
       await onAddToCart(product, quantity);
-      setQuantity(1); // Reset to 1 after adding
+      setQuantity(1);
+      
+      setJustAdded(true);
+      
+      setTimeout(() => {
+        setJustAdded(false);
+      }, 2000);
     } finally {
       setIsAdding(false);
     }
   };
 
   const handleQuantityChange = (e) => {
-    const value = Math.max(1, Math.min(Number(e.target.value), product.quantity));
+    const value = Math.max(1, Math.min(Number(e.target.value), remainingQuantity));
     setQuantity(value);
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-all group">
+    <div className={`border rounded-lg p-4 transition-all ${
+      isFullyInCart 
+        ? 'border-gray-200 bg-gray-50 opacity-75' 
+        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 group'
+    }`}>
       <div className="space-y-3">
         {/* Bin Info */}
         <div className="flex items-center justify-between">
@@ -198,9 +222,17 @@ const ProductBinCard = ({ product, onAddToCart }) => {
               {product.bin}
             </span>
           </div>
-          <span className="text-sm text-gray-600">
-            {product.quantity} available
-          </span>
+          <div className="text-right">
+            <div className="text-sm text-gray-600">
+              {remainingQuantity} available
+            </div>
+            {quantityInCart > 0 && (
+              <div className="text-xs text-purple-600 flex items-center justify-end mt-1">
+                <ShoppingCart className="w-3 h-3 mr-1" />
+                {quantityInCart} in cart
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Product Details */}
@@ -223,20 +255,42 @@ const ProductBinCard = ({ product, onAddToCart }) => {
             <input
               type="number"
               min="1"
-              max={product.quantity}
+              max={remainingQuantity}
               value={quantity}
               onChange={handleQuantityChange}
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              disabled={isFullyInCart}
+              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               placeholder="Qty"
             />
           </div>
           <button
             onClick={handleAdd}
-            disabled={isAdding || product.quantity === 0}
-            className="flex-shrink-0 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded transition-colors flex items-center"
+            disabled={isAdding || isFullyInCart}
+            className={`flex-shrink-0 px-3 py-1 text-white text-sm font-medium rounded transition-all flex items-center ${
+              isFullyInCart
+                ? 'bg-gray-400 cursor-not-allowed'
+                : justAdded 
+                ? 'bg-green-600 hover:bg-green-700' 
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
             {isAdding ? (
               <RefreshCw className="w-3 h-3 animate-spin" />
+            ) : isFullyInCart ? (
+              <>
+                <Check className="w-3 h-3 mr-1" />
+                In Cart
+              </>
+            ) : justAdded ? (
+              <>
+                <Check className="w-3 h-3 mr-1" />
+                Added
+              </>
+            ) : quantityInCart > 0 ? (
+              <>
+                <Plus className="w-3 h-3 mr-1" />
+                Add More
+              </>
             ) : (
               <>
                 <Plus className="w-3 h-3 mr-1" />
