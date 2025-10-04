@@ -1,4 +1,3 @@
-```markdown
 # Inventory Management System
 
 A full-stack web application designed to streamline inventory tracking, manage inbound and outbound stock, and provide robust user management capabilities for administrators. This system offers a user-friendly interface to monitor inventory levels, process transactions, and maintain an organized warehouse.
@@ -166,4 +165,3 @@ Follow these instructions to get a copy of the project up and running on your lo
 
 **Admin Dashboard - User Management**
 ![Admin Dashboard](https://i.imgur.com/P4q2A1G.png)
-````
