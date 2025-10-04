@@ -12,7 +12,7 @@ const inventoryRoutes = require('./routes/inventory');
 const metadataRoutes = require('./routes/metadata');
 const cleanupService = require('./utils/cleanupService');
 // Add this import for admin bootstrap
-const { checkAndCreateAdmin } = require('./utils/adminBootstrap');
+const { checkAndCreateAdmin } = require('./utils/adminbootstrap');
 
 // Load environment variables
 dotenv.config();
