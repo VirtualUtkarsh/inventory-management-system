@@ -1,9 +1,6 @@
 # Inventory Management System
 
 A full-stack web application designed to streamline inventory tracking, manage inbound and outbound stock, and provide robust user management capabilities for administrators. This system offers a user-friendly interface to monitor inventory levels, process transactions, and maintain an organized warehouse.
-
-[![Inventory Dashboard](https://i.imgur.com/v8F7d3B.png)](https://inventorydeploy.vercel.app/)
-
 ## Live Demo
 
 You can test the live application here:
@@ -154,5 +151,7 @@ Follow these instructions to get a copy of the project up and running on your lo
 -   Open your browser and navigate to `http://localhost:3000`.
 -   Log in using the admin credentials you created in the server console on the first startup.
 -   You can now register new users from the frontend. As an admin, you can approve or manage these new users from the Admin Dashboard.
+
+##Contributions are welcome! If you have suggestions for improvements or encounter any issues, please feel free to open an issue or submit a pull request.
 
 
