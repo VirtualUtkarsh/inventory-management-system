@@ -1,7 +1,7 @@
 // server/utils/excelImportService.js
 const XLSX = require('xlsx');
 const Inventory = require('../models/Inventory');
-const Bin = require('../models/Bin');
+const Bin = require('../models/bin');
 const AuditLog = require('../models/AuditLog');
 
 class ExcelImportService {

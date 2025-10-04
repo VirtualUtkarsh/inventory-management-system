@@ -323,8 +323,8 @@ export default function OutsetPage() {
       'Customer',
       'Invoice',
       'User',
-      'Type',
-      'Batch ID'
+      'Type'
+      // 'Batch ID'
     ];
     
     const csvData = filteredOutsets.map(item => [
@@ -336,8 +336,8 @@ export default function OutsetPage() {
       item.customerName || '',
       item.invoiceNo || '',
       item.user?.name || 'System',
-      item.batchId ? 'Batch' : 'Single',
-      item.batchId || ''
+      item.batchId ? 'Batch' : 'Single'
+      // item.batchId || ''
     ]);
     
     const csvContent = [headers, ...csvData]
@@ -411,7 +411,7 @@ export default function OutsetPage() {
         <div class="print-date">
           Generated on: ${new Date().toLocaleString()}
         </div>
-      </body>
+      </body> 
       </html>
     `;
     
@@ -422,10 +422,10 @@ export default function OutsetPage() {
     printWindow.close();
   };
 
-  const getUniqueBins = () => {
-    const uniqueBins = [...new Set(outsetItems.map(item => item.bin).filter(Boolean))];
-    return uniqueBins.sort();
-  };
+  // const getUniqueBins = () => {
+  //   const uniqueBins = [...new Set(outsetItems.map(item => item.bin).filter(Boolean))];
+  //   return uniqueBins.sort();
+  // };
 
   // Calculate metrics
   const totalOutbound = outsetItems.length;

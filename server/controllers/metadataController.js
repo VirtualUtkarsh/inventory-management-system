@@ -3,7 +3,7 @@ const ProductSize = require('../models/ProductSize');
 const Color = require('../models/Color');
 const Pack = require('../models/Pack');
 const ProductCategory = require('../models/ProductCategory');
-const Bin = require('../models/Bin');
+const Bin = require('../models/bin');
 
 // Generic CRUD functions for all metadata types
 const createMetadataController = (Model, name) => ({
