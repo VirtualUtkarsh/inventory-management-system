@@ -155,13 +155,4 @@ Follow these instructions to get a copy of the project up and running on your lo
 -   Log in using the admin credentials you created in the server console on the first startup.
 -   You can now register new users from the frontend. As an admin, you can approve or manage these new users from the Admin Dashboard.
 
-## Screenshots
 
-**Inbound Management**
-![Inbound Management](https://i.imgur.com/k9b9vYp.png)
-
-**Outbound Management**
-![Outbound Management](https://i.imgur.com/B9B1k1x.png)
-
-**Admin Dashboard - User Management**
-![Admin Dashboard](https://i.imgur.com/P4q2A1G.png)
