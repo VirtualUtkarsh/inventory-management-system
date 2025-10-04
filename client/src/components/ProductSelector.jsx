@@ -87,7 +87,7 @@ const ProductSelector = ({
           </div>
           
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 -mt-2" />
             <input
               type="text"
               placeholder="Search by SKU, product name, or bin location..."
@@ -266,12 +266,12 @@ const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
           <button
             onClick={handleAdd}
             disabled={isAdding || isFullyInCart}
-            className={`flex-shrink-0 px-3 py-1 text-white text-sm font-medium rounded transition-all flex items-center ${
+            className={` -mt-4 flex-shrink-0 px-3 py-1 text-white text-sm font-medium rounded transition-all flex items-center ${
               isFullyInCart
                 ? 'bg-gray-400 cursor-not-allowed'
                 : justAdded 
                 ? 'bg-green-600 hover:bg-green-700' 
-                : 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-blue-600 hover:bg-blue-700' 
             }`}
           >
             {isAdding ? (
@@ -288,7 +288,7 @@ const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
               </>
             ) : quantityInCart > 0 ? (
               <>
-                <Plus className="w-3 h-3 mr-1" />
+                <Plus className="w-3 h-3 mr-1 " />
                 Add More
               </>
             ) : (

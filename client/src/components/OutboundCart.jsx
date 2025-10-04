@@ -61,7 +61,7 @@ const OutboundCart = ({
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <ShoppingCart className="w-6 h-6 text-blue-600 mr-3" />
+              <ShoppingCart className="w-6 h-6 text-blue-600 mr-3 -mt-6" />
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
                   Outbound Cart ({cartItems.length})
@@ -304,9 +304,9 @@ const CartItem = ({
               <button
                 onClick={handleConfirmEdit}
                 disabled={disabled}
-                className="p-1 text-green-600 hover:bg-green-100 disabled:text-green-400 rounded transition-colors"
+                className="p-1 text-green-600 hover:bg-green-100 disabled:text-green-400 rounded transition-colors -mt-3"
               >
-                <Check className="w-4 h-4" />
+                <Check className="w-7 h-7" />
               </button>
               <button
                 onClick={() => {
@@ -314,16 +314,16 @@ const CartItem = ({
                   onCancelEdit();
                 }}
                 disabled={disabled}
-                className="p-1 text-gray-500 hover:bg-gray-100 disabled:text-gray-400 rounded transition-colors"
+                className="p-1 text-red-500 hover:bg-red-100 disabled:text-gray-400 rounded transition-colors -mt-3"
               >
-                <X className="w-4 h-4" />
+                <X className="w-7 h-7" />
               </button>
             </div>
           ) : (
             <button
               onClick={onEdit}
               disabled={disabled}
-              className="flex items-center space-x-1 px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded transition-colors"
+              className="flex items-center space-x-1 px-3 py-2 text-base font-medium text-gray-700 bg-gray-100 hover:bg-gray-300 disabled:bg-gray-50 disabled:text-gray-400 rounded transition-colors"
             >
               <span>Qty: {item.quantity}</span>
               <Edit2 className="w-3 h-3" />

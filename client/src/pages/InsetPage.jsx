@@ -566,9 +566,9 @@ const InsetPage = () => {
             </div>
             <button
               onClick={resetForm}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 text-gray-700 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-7 h-7" />
             </button>
           </div>
           
@@ -667,7 +667,7 @@ const InsetPage = () => {
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                className="px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-200 font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -710,10 +710,10 @@ const InsetPage = () => {
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                className={`inline-flex items-center px-4 py-2 text-base font-medium rounded-lg border transition-colors ${
                   showFilters 
                     ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-200'
                 }`}
               >
                 <Filter className="w-4 h-4 mr-2" />
@@ -723,7 +723,7 @@ const InsetPage = () => {
               <button
                 onClick={fetchInsets}
                 disabled={loading}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center px-4 py-2 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh

@@ -463,10 +463,10 @@ const InventoryPage = () => {
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                className={`inline-flex items-center px-4 py-2 text-base font-medium rounded-lg border transition-colors ${
                   showFilters 
                     ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-200'
                 }`}
               >
                 <Filter className="w-4 h-4 mr-2" />
@@ -476,7 +476,7 @@ const InventoryPage = () => {
               <button
                 onClick={throttledRefresh}
                 disabled={loading}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center px-4 py-2 text-LG font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
