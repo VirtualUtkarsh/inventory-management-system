@@ -152,6 +152,6 @@ Follow these instructions to get a copy of the project up and running on your lo
 -   Log in using the admin credentials you created in the server console on the first startup.
 -   You can now register new users from the frontend. As an admin, you can approve or manage these new users from the Admin Dashboard.
 
-##Contributions are welcome! If you have suggestions for improvements or encounter any issues, please feel free to open an issue or submit a pull request.
+## Contributions are welcome! If you have suggestions for improvements or encounter any issues, please feel free to open an issue or submit a pull request.
 
 
