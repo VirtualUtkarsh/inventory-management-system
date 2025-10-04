@@ -26,7 +26,8 @@ const app = express();
 const corsOptions = {
   origin: [
     'http://localhost:3000',
-    'https://inventory-frontend-3trd.onrender.com',
+    // 'https://inventory-frontend-3trd.onrender.com',
+    'https://inventory-management-system-jhci.onrender.com/',
     /\.devtunnels\.ms$/,
     /.*\.vercel\.app$/,
   ],
