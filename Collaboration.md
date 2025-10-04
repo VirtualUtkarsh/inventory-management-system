@@ -19,7 +19,7 @@ This document explains exactly how our team will collaborate using Git and GitHu
 
 ```bash
 git clone https://github.com/TusharVaishnaw/InventorymgmtV1.git
-cd InventorymgmtV1
+cd inventory-management-system
 git fetch --all
 git checkout dev
 git pull origin dev
@@ -90,3 +90,4 @@ Try GPT
 
 
 >>>>>>> c2d2180bc27d20c9c613aff0dba9a3ab004bcaa5
+
