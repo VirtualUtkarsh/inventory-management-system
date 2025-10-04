@@ -451,7 +451,7 @@ const AdminDashboard = () => {
 
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 -mt-2" />
                 <input
                   type="text"
                   placeholder="Search users..."
@@ -634,7 +634,7 @@ const AdminDashboard = () => {
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                 {/* Search bar for bins */}
                 <div className="relative flex-1 sm:flex-initial">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 -mt-2" />
                   <input
                     type="text"
                     placeholder="Search bins..."

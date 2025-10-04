@@ -549,7 +549,7 @@ export default function OutsetPage() {
             {/* Search */}
             <div className="flex-1 max-w-lg">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 -mt-2" />
                 <input
                   type="text"
                   name="search"
@@ -685,46 +685,46 @@ export default function OutsetPage() {
 
               {/* Quick Filters */}
               <div className="flex flex-wrap gap-4 pt-4">
-                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-200 cursor-pointer">
                   <input
                     type="checkbox"
                     name="recentOnly"
                     checked={filters.recentOnly}
                     onChange={handleFilterChange}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                   />
                   <span className="text-sm text-gray-700">Last 7 Days</span>
                 </label>
 
-                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-200 cursor-pointer">
                   <input
                     type="checkbox"
                     name="todayOnly"
                     checked={filters.todayOnly}
                     onChange={handleFilterChange}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                   />
                   <span className="text-sm text-gray-700">Today Only</span>
                 </label>
 
-                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-200 cursor-pointer">
                   <input
                     type="checkbox"
                     name="largeQuantity"
                     checked={filters.largeQuantity}
                     onChange={handleFilterChange}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                   />
                   <span className="text-sm text-gray-700">Large Orders (≥10)</span>
                 </label>
 
-                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-200 cursor-pointer">
                   <input
                     type="checkbox"
                     name="batchOnly"
                     checked={filters.batchOnly}
                     onChange={handleFilterChange}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-4"
                   />
                   <span className="text-sm text-gray-700">Batch Orders Only</span>
                 </label>

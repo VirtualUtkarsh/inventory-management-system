@@ -1,4 +1,4 @@
-//Enhanced UI with batch import functionality
+//Enhanced UI with batch import functionality and searchable bin selector
 import React, { useState, useEffect, useCallback } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +19,8 @@ import {
   X,
   AlertTriangle,
   Package,
-  Upload
+  Upload,
+  Layers
 } from 'lucide-react';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -34,15 +35,16 @@ const InsetPage = () => {
 
   const [insets, setInsets] = useState([]);
   const [filteredInsets, setFilteredInsets] = useState([]);
-  const [bins, setBins] = useState([]); // Available bins from admin
+  const [bins, setBins] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [binsLoading, setBinsLoading] = useState(true);
+  const [binSearchTerm, setBinSearchTerm] = useState('');
+  const [showBinDropdown, setShowBinDropdown] = useState(false);
 
-  // Simplified filter states
   const [filters, setFilters] = useState({
     search: '',
     skuId: '',
@@ -54,7 +56,6 @@ const InsetPage = () => {
     todayOnly: false
   });
 
-  // Fetch available bins
   const fetchBins = useCallback(async () => {
     try {
       const res = await axiosInstance.get('/api/metadata/bins', {
@@ -71,7 +72,6 @@ const InsetPage = () => {
     }
   }, [token]);
 
-  // Fetch insets using useCallback
   const fetchInsets = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -89,7 +89,6 @@ const InsetPage = () => {
     }
   }, [token]);
 
-  // Handle Excel import completion
   const handleImportComplete = useCallback((results) => {
     console.log('Import completed:', results);
     
@@ -101,8 +100,6 @@ const InsetPage = () => {
           `Successfully imported ${importResults.successCount} inbound records. ` +
           `Refreshing data...`
         );
-        
-        // Refresh insets data after successful import
         setTimeout(() => {
           fetchInsets();
           setShowImportModal(false);
@@ -130,11 +127,20 @@ const InsetPage = () => {
     fetchInsets();
   }, [fetchBins, fetchInsets]);
 
-  // Apply filters whenever filters or insets changes
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showBinDropdown && !event.target.closest('.bin-dropdown-container')) {
+        setShowBinDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showBinDropdown]);
+
   useEffect(() => {
     let filtered = [...insets];
 
-    // Search filter (searches SKU ID and bin)
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(item => 
@@ -143,28 +149,24 @@ const InsetPage = () => {
       );
     }
 
-    // SKU ID filter
     if (filters.skuId) {
       filtered = filtered.filter(item => 
         (item.skuId || '').toLowerCase().includes(filters.skuId.toLowerCase())
       );
     }
 
-    // Bin filter
     if (filters.bin) {
       filtered = filtered.filter(item => 
         (item.bin || '').toLowerCase().includes(filters.bin.toLowerCase())
       );
     }
 
-    // User name filter
     if (filters.userName) {
       filtered = filtered.filter(item => 
         (item.user?.name || '').toLowerCase().includes(filters.userName.toLowerCase())
       );
     }
 
-    // Date filters
     if (filters.dateFrom) {
       const fromDate = new Date(filters.dateFrom);
       fromDate.setHours(0, 0, 0, 0);
@@ -181,7 +183,6 @@ const InsetPage = () => {
       );
     }
 
-    // Recent only (last 7 days)
     if (filters.recentOnly) {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -190,7 +191,6 @@ const InsetPage = () => {
       );
     }
 
-    // Today only
     if (filters.todayOnly) {
       const today = new Date();
       const startOfDay = new Date(today);
@@ -234,11 +234,31 @@ const InsetPage = () => {
       ...prev,
       [name]: name === 'quantity' ? Number(value) : value
     }));
-    // Clear error when user starts typing
     if (error) setError(null);
   };
 
-  // Simplified form validation
+  const getFilteredBins = () => {
+    if (!binSearchTerm) return bins;
+    return bins.filter(bin => 
+      bin.name.toLowerCase().includes(binSearchTerm.toLowerCase())
+    );
+  };
+
+  const handleBinSelect = (binName) => {
+    setFormData(prev => ({ ...prev, bin: binName }));
+    setBinSearchTerm(binName);
+    setShowBinDropdown(false);
+  };
+
+  const handleBinSearchChange = (e) => {
+    const value = e.target.value;
+    setBinSearchTerm(value);
+    setShowBinDropdown(true);
+    if (formData.bin && !bins.find(b => b.name === value)) {
+      setFormData(prev => ({ ...prev, bin: '' }));
+    }
+  };
+
   const validateForm = () => {
     const requiredFields = ['skuId', 'bin', 'quantity'];
     
@@ -258,7 +278,6 @@ const InsetPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Frontend validation
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
@@ -268,10 +287,9 @@ const InsetPage = () => {
     setLoading(true);
     setError(null);
 
-    // Prepare submission data with user info
     const submissionData = {
       skuId: formData.skuId.trim().toUpperCase(),
-      bin: formData.bin, // Keep as selected from dropdown
+      bin: formData.bin,
       quantity: Number(formData.quantity),
       user: {
         id: user.id,
@@ -284,12 +302,12 @@ const InsetPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Reset form
       setFormData({
         skuId: '',
         bin: '',
         quantity: ''
       });
+      setBinSearchTerm('');
       setShowForm(false);
       await fetchInsets();
       toast.success('Inbound item added successfully!');
@@ -310,26 +328,14 @@ const InsetPage = () => {
     });
     setShowForm(false);
     setError(null);
+    setBinSearchTerm('');
+    setShowBinDropdown(false);
   };
 
-  // Get unique bins from filtered insets for filter dropdown
-  const getUniqueBins = () => {
-    const uniqueBins = [...new Set(insets.map(item => item.bin).filter(Boolean))];
-    return uniqueBins.sort();
-  };
-
-  // Download CSV function
   const downloadCSV = () => {
     if (filteredInsets.length === 0) return;
 
-    const headers = [
-      'SKU ID',
-      'Bin',
-      'Quantity',
-      'Added By',
-      'Date'
-    ];
-
+    const headers = ['SKU ID', 'Bin', 'Quantity', 'Added By', 'Date'];
     const csvData = filteredInsets.map(item => [
       item.skuId || 'N/A',
       item.bin || '',
@@ -354,7 +360,6 @@ const InsetPage = () => {
     toast.success('Inbound records exported to CSV');
   };
 
-  // Print table function
   const printTable = () => {
     if (filteredInsets.length === 0) return;
 
@@ -413,7 +418,6 @@ const InsetPage = () => {
     printWindow.close();
   };
 
-  // Calculate metrics
   const totalInbound = insets.length;
   const totalQuantityAdded = insets.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const todayCount = insets.filter(item => {
@@ -421,20 +425,19 @@ const InsetPage = () => {
     const itemDate = new Date(item.createdAt);
     return itemDate.toDateString() === today.toDateString();
   }).length;
+  const uniqueSkus = [...new Set(insets.map(item => item.skuId).filter(Boolean))].length;
 
-  // Show loading if bins are still loading
   if (binsLoading) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 text-gray-400 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Loading bins...</p>
+          <p className="text-gray-600">Loading inbounds...</p>
         </div>
       </div>
     );
   }
 
-  // Show error if no bins available
   if (bins.length === 0 && !binsLoading) {
     return (
       <div className="space-y-6">
@@ -461,7 +464,6 @@ const InsetPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Inbound Management</h1>
@@ -505,8 +507,7 @@ const InsetPage = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -542,9 +543,20 @@ const InsetPage = () => {
             </div>
           </div>
         </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <Layers className="w-6 h-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Unique SKUs</p>
+              <p className="text-2xl font-bold text-gray-900">{uniqueSkus}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Add Form Modal/Card */}
       {showForm && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
@@ -560,7 +572,6 @@ const InsetPage = () => {
             </button>
           </div>
           
-          {/* Error Display */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
               <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -570,7 +581,6 @@ const InsetPage = () => {
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* SKU ID */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   SKU ID <span className="text-red-500">*</span>
@@ -586,26 +596,56 @@ const InsetPage = () => {
                 />
               </div>
 
-              {/* Bin Location */}
-              <div>
+              <div className="relative bin-dropdown-container">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Bin Location <span className="text-red-500">*</span>
                 </label>
-                <select
-                  name="bin"
-                  value={formData.bin}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                >
-                  <option value="">Select a bin...</option>
-                  {bins.map(bin => (
-                    <option key={bin._id} value={bin.name}>{bin.name}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none -mt-2" />
+                  <input
+                    type="text"
+                    value={binSearchTerm}
+                    onChange={handleBinSearchChange}
+                    onFocus={() => setShowBinDropdown(true)}
+                    placeholder="Search and select bin..."
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  />
+                </div>
+                
+                {showBinDropdown && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {getFilteredBins().length > 0 ? (
+                      <ul className="py-1">
+                        {getFilteredBins().map(bin => (
+                          <li
+                            key={bin._id}
+                            onClick={() => handleBinSelect(bin.name)}
+                            className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm text-gray-900 flex items-center justify-between"
+                          >
+                            <span>{bin.name}</span>
+                            {formData.bin === bin.name && (
+                              <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                        No bins found matching "{binSearchTerm}"
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {formData.bin && (
+                  <div className="mt-2 text-xs text-green-600 flex items-center">
+                    <div className="w-2 h-2 bg-green-600 rounded-full mr-1"></div>
+                    Selected: {formData.bin}
+                  </div>
+                )}
               </div>
 
-              {/* Quantity */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Quantity <span className="text-red-500">*</span>
@@ -650,11 +690,9 @@ const InsetPage = () => {
         </div>
       )}
 
-      {/* Search and Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-            {/* Search */}
             <div className="flex-1 max-w-lg">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 -mt-2" />
@@ -669,7 +707,6 @@ const InsetPage = () => {
               </div>
             </div>
             
-            {/* Filter Toggle & Actions */}
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -694,7 +731,6 @@ const InsetPage = () => {
             </div>
           </div>
 
-          {/* Expanded Filters */}
           {showFilters && (
             <div className="mt-6 pt-6 border-t border-gray-200 space-y-4">
               <div className="flex justify-between items-center">
@@ -719,18 +755,19 @@ const InsetPage = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-{/* Bin Filter - Search input */}
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-2">Bin Location</label>
-  <input
-    type="text"
-    name="bin"
-    value={filters.bin}
-    onChange={handleFilterChange}
-    placeholder="Search bin location..."
-    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-  />
-</div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bin Location</label>
+                  <input
+                    type="text"
+                    name="bin"
+                    value={filters.bin}
+                    onChange={handleFilterChange}
+                    placeholder="Search bin location..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Added By</label>
                   <input
@@ -766,9 +803,8 @@ const InsetPage = () => {
                 </div>
               </div>
 
-              {/* Quick Filters */}
               <div className="flex flex-wrap gap-4 pt-4">
-                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-200 cursor-pointer">
                   <input
                     type="checkbox"
                     name="recentOnly"
@@ -779,7 +815,7 @@ const InsetPage = () => {
                   <span className="text-sm text-gray-700">Last 7 Days</span>
                 </label>
 
-                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+                <label className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-200 cursor-pointer">
                   <input
                     type="checkbox"
                     name="todayOnly"
@@ -795,7 +831,6 @@ const InsetPage = () => {
         </div>
       </div>
 
-      {/* Results Summary */}
       <div className="flex justify-between items-center">
         <p className="text-sm text-gray-600">
           Showing {filteredInsets.length} of {totalInbound} inbound records
@@ -803,7 +838,6 @@ const InsetPage = () => {
         </p>
       </div>
 
-      {/* Inbound Records Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {loading && insets.length === 0 ? (
           <div className="p-12 text-center">
@@ -820,7 +854,6 @@ const InsetPage = () => {
           </div>
         ) : (
           <>
-            {/* Table Header */}
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
                 <div>
@@ -832,7 +865,6 @@ const InsetPage = () => {
               </div>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -891,7 +923,6 @@ const InsetPage = () => {
               </table>
             </div>
 
-            {/* Table Footer with Summary */}
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
                 <div className="flex items-center space-x-6 text-sm text-gray-600">
@@ -914,7 +945,6 @@ const InsetPage = () => {
         )}
       </div>
 
-      {/* Excel Import Modal */}
       {showImportModal && (
         <ExcelImport
           importType="inbound"
