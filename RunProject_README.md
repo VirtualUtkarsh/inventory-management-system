@@ -16,9 +16,9 @@ This guide will help you clone and run the Inventory Management System project o
 
 Open your terminal and run:
 
-```bash
-git clone https://github.com/TusharVaishnaw/InventorymgmtV1.git
-cd InventorymgmtV1
+```bash 
+git clone https://github.com/TusharVaishnaw/inventory-management-system.git
+cd inventory-management-system
 ```
 
 ---
@@ -43,7 +43,7 @@ touch .env
 
 ```env
 MONGO_URI=<your mongodb string>
-JWT_SECRET=ae9cb9e34a4c4f38b4c3b1df44f0f2e4f8c4ae62b8a7f299c2fd838f673ac139c1f19f21a891499b3d11f3f26ef7c304d31bdcc4761c3c5c50fd25cb5a64a93b
+JWT_SECRET=<your super key, any long alphanumeric strong>
 PORT=5000
 ```
 
@@ -96,3 +96,4 @@ npm run dev
 
 ## 🤝 You're all set!
 =
+
