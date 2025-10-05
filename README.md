@@ -5,7 +5,7 @@ A full-stack web application designed to streamline inventory tracking, manage i
 
 You can test the live application here:
 
-**Link:** [https://inventory-frontend-3trd.onrender.com/](https://inventory-frontend-3trd.onrender.com/)
+**Link:** [https://inventory-management-system-jhci.onrender.com/](https://inventory-management-system-jhci.onrender.com/)
 
 **Admin Credentials:**
 -   **Email:** `admin123@inventory.com`
