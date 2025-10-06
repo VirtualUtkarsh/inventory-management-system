@@ -162,32 +162,23 @@ class InboundExcelImportService {
       await this.ensureBinExists(bin);
 
     // Prepare inbound record data
-    const insetData = {
-      skuId: sku.trim().toUpperCase(),
-      bin: bin,
-      quantity: quantity,
-      user: {
-        id: this.userId,
-        name: this.username || 'Excel Import'
-      }
-    };
+ // Prepare inbound record data
+      const insetData = {
+        skuId: sku.trim().toUpperCase(),
+        bin: bin,
+        quantity: quantity,
+        user: {
+          id: this.userId,
+          name: this.username || 'Excel Import'
+        }
+      };
 
-    // Update or create inbound record (Option 1)
-    let savedInset;
-    const existingInset = await Inset.findOne({ skuId: insetData.skuId, bin: insetData.bin });
-
-    if (existingInset) {
-      existingInset.quantity += insetData.quantity;
-      savedInset = await existingInset.save();
-      console.log(`🔄 Inbound record updated: ${savedInset._id} (new qty: ${savedInset.quantity})`);
-    } else {
+      // Create a NEW inbound record for each Excel row
+      // This ensures each batch import creates a separate transaction record
       const inset = new Inset(insetData);
-      savedInset = await inset.save();
-      console.log(`✅ Inbound record created: ${savedInset._id}`);
-    }
-
-
-      console.log(`✅ Inbound record created: ${savedInset._id}`);
+      const savedInset = await inset.save();
+      
+      console.log(`✅ Inbound record created: ${savedInset._id} | SKU: ${savedInset.skuId} | Bin: ${savedInset.bin} | Qty: ${savedInset.quantity}`);
 
       // Update inventory
       try {

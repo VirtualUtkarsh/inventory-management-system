@@ -82,51 +82,128 @@ const ExcelImport = ({
   };
 
   // Upload and process
-  const handleUpload = async () => {
-    if (!file) {
-      setError('Please select a file first');
-      return;
+const handleUpload = async () => {
+  if (!file) {
+    setError('Please select a file first');
+    return;
+  }
+
+  setIsUploading(true);
+  setError(null);
+  setResults(null);
+  setShowSummary(false);
+
+  try {
+    const formData = new FormData();
+    formData.append('excelFile', file);
+
+    console.log('📤 Uploading file:', file.name, 'as', importType);
+
+    const response = await axios.post(getImportEndpoint(), formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 300000, // 5 mins
+    });
+
+    console.log('✅ Import completed - Full response:', response.data);
+    
+    // Handle different response structures from different endpoints
+    let flatResults;
+    
+    // Check if it's the nested structure (inventory endpoint)
+    if (response.data?.data?.results) {
+      const apiResults = response.data.data.results;
+      const summary = apiResults.summary || {};
+      
+      flatResults = {
+        totalRows: summary.totalRows || 0,
+        successCount: summary.successCount || 0,
+        errorCount: summary.errorCount || 0,
+        warningCount: summary.warningCount || 0,
+        stats: {
+          successRate: summary.successRate || '0%'
+        },
+        createdBins: apiResults.createdBins || [],
+        summary: apiResults.itemsProcessed || [],
+        errors: apiResults.errors || [],
+        warnings: apiResults.warnings || []
+      };
     }
+    // Check if it's already flat (inbound endpoint - old structure)
+    else if (response.data?.totalRows !== undefined) {
+      flatResults = {
+        totalRows: response.data.totalRows || 0,
+        successCount: response.data.successCount || 0,
+        errorCount: response.data.errorCount || 0,
+        warningCount: response.data.warningCount || 0,
+        stats: {
+          successRate: response.data.stats?.successRate || '0%'
+        },
+        createdBins: response.data.createdBins || [],
+        summary: response.data.summary || [],
+        errors: response.data.errors || [],
+        warnings: response.data.warnings || []
+      };
+    }
+    // Fallback - try to extract whatever we can
+    else {
+      console.warn('Unknown response structure:', response.data);
+      flatResults = {
+        totalRows: 0,
+        successCount: 0,
+        errorCount: 0,
+        warningCount: 0,
+        stats: { successRate: '0%' },
+        createdBins: [],
+        summary: [],
+        errors: [],
+        warnings: []
+      };
+    }
+    
+    console.log('📊 Processed results:', flatResults);
+    setResults(flatResults);
+    setShowSummary(true);
 
-    setIsUploading(true);
-    setError(null);
-    setResults(null);
-    setShowSummary(false);
-
-    try {
-      const formData = new FormData();
-      formData.append('excelFile', file);
-
-      console.log('📤 Uploading file:', file.name, 'as', importType);
-
-      const response = await axios.post(getImportEndpoint(), formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 300000, // 5 mins
-      });
-
-      console.log('✅ Import completed:', response.data);
-      setResults(response.data);
-      setShowSummary(true);
-
-    } catch (err) {
-      console.error('❌ Upload failed:', err);
-      if (err.response?.data) {
-        // Use server error message if provided
-        setError(err.response.data.message || 'Import failed');
-        // If server returned detailed results (errors etc.), preserve them
-        if (err.response.data) {
-          setResults(err.response.data);
-          setShowSummary(true);
-        }
-      } else if (err.code === 'ECONNABORTED') {
-        setError('Upload timeout. File may be too large or connection is slow.');
-      } else {
-        setError('Network error. Please check your connection and try again.');
+  } catch (err) {
+    console.error('❌ Upload failed:', err);
+    if (err.response?.data) {
+      setError(err.response.data.message || 'Import failed');
+      
+      // Try to extract results from error response too
+      let flatResults;
+      
+      if (err.response.data?.data?.results) {
+        const apiResults = err.response.data.data.results;
+        const summary = apiResults.summary || {};
+        
+        flatResults = {
+          totalRows: summary.totalRows || 0,
+          successCount: summary.successCount || 0,
+          errorCount: summary.errorCount || 0,
+          warningCount: summary.warningCount || 0,
+          stats: { successRate: summary.successRate || '0%' },
+          createdBins: apiResults.createdBins || [],
+          summary: apiResults.itemsProcessed || [],
+          errors: apiResults.errors || [],
+          warnings: apiResults.warnings || []
+        };
+      } else if (err.response.data?.totalRows !== undefined) {
+        flatResults = err.response.data;
       }
-    } finally {
-      setIsUploading(false);
+      
+      if (flatResults && flatResults.totalRows > 0) {
+        setResults(flatResults);
+        setShowSummary(true);
+      }
+    } else if (err.code === 'ECONNABORTED') {
+      setError('Upload timeout. File may be too large or connection is slow.');
+    } else {
+      setError('Network error. Please check your connection and try again.');
     }
-  };
+  } finally {
+    setIsUploading(false);
+  }
+};
 
   const handleComplete = () => {
     if (onImportComplete && results) {

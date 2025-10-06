@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState ,useCallback} from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import { useAuth } from '../context/AuthContext';
+import ExcelImport from '../components/ExcelImport';
 import {
   Users,
   Archive,
@@ -18,12 +19,13 @@ import {
   Settings,
   Calendar,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Upload
 } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { user, token } = useAuth();
-  
+  const [showImportModal, setShowImportModal] = useState(false);
   // User Management State
   const [pendingUsers, setPendingUsers] = useState([]);
   const [approvedUsers, setApprovedUsers] = useState([]);
@@ -188,6 +190,27 @@ const AdminDashboard = () => {
       alert('Failed to delete bin. It might be in use by existing inventory items.');
     }
   };
+  const handleImportComplete = useCallback((results) => {
+  console.log('Import completed:', results);
+  setShowImportModal(false);
+  
+  if (results.data && results.data.results && results.data.results.summary) {
+    const { summary } = results.data.results;
+    
+    if (summary.successCount > 0) {
+      alert(
+        `Successfully imported ${summary.successCount} items. ` +
+        `${summary.createdBinsCount > 0 ? `Created ${summary.createdBinsCount} new bins.` : ''}`
+      );
+    }
+    
+    if (summary.errorCount > 0) {
+      alert(`${summary.errorCount} items had errors during import.`);
+    }
+  } else {
+    alert('Import completed successfully.');
+  }
+}, []);
 
   const handleSubmitBin = async (e) => {
     e.preventDefault();
@@ -385,6 +408,19 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+<div className="flex justify-center mt-4 mb-6">
+  <button
+    onClick={() => setActiveTab('import')}
+    className={`group relative inline-flex items-center gap-2 px-6 py-3 font-medium text-white rounded-xl transition-all duration-300 
+      ${activeTab === 'import' 
+        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-md scale-105' 
+        : 'bg-gradient-to-r from-purple-500/80 to-indigo-500/80 hover:from-purple-600 hover:to-indigo-600 shadow-sm hover:shadow-md'
+      }`}
+  >
+    <Upload className="w-5 h-5 text-white group-hover:rotate-6 transition-transform" />
+    <span>Batch Import</span>
+  </button>
+</div>
 
       {/* Tab Navigation */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -747,7 +783,41 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
+        {/* Import Tab Content */}
+{activeTab === 'import' && (
+  <div className="p-6">
+    <div className="max-w-2xl mx-auto">
+      <div className="text-center mb-8">
+        <div className="inline-flex p-4 bg-purple-100 rounded-full mb-4">
+          <Upload className="w-8 h-8 text-purple-600" />
+        </div>
+        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+          Batch Import Inventory
+        </h2>
+        <p className="text-gray-600">
+          Upload an Excel file to bulk import inventory data
+        </p>
+      </div>
 
+      <button
+        onClick={() => setShowImportModal(true)}
+        className="w-full inline-flex items-center justify-center px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white text-lg font-medium rounded-lg transition-colors"
+      >
+        <Upload className="w-5 h-5 mr-3" />
+        Start Import Process
+      </button>
+
+      <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <h3 className="text-sm font-medium text-blue-900 mb-2">Import Guidelines:</h3>
+        <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+          <li>Ensure your Excel file has the correct format</li>
+          <li>Required columns: SKU ID, Bin, Quantity</li>
+          <li>Bins will be created automatically if they don't exist</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+)}
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -813,6 +883,13 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+      {/* Excel Import Modal */}
+{showImportModal && (
+  <ExcelImport
+    onClose={() => setShowImportModal(false)}
+    onImportComplete={handleImportComplete}
+  />
+)}
     </div>
   );
 };
