@@ -31,7 +31,7 @@ export default function OutsetPage() {
     outsets: true, 
     processing: false 
   });
-  
+  const [deletingOutset, setDeletingOutset] = useState(false);
   // Modal states
   const [showProductSelector, setShowProductSelector] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -310,7 +310,29 @@ export default function OutsetPage() {
       setLoading(prev => ({ ...prev, processing: false }));
     }
   };
+const handleDeleteOutset = async (outsetId) => {
+  try {
+    setDeletingOutset(true);
+    
+    const response = await axiosInstance.delete(`/api/outsets/${outsetId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
+    console.log('✅ Outset deleted:', response.data);
+    
+    toast.success(
+      `Outbound deleted! ${response.data.inventoryUpdate.restored} units restored to bin ${response.data.inventoryUpdate.bin}`
+    );
+    
+    // Refresh data
+    await fetchData();
+  } catch (error) {
+    console.error('❌ Delete error:', error);
+    toast.error(error.response?.data?.message || 'Failed to delete outbound record');
+  } finally {
+    setDeletingOutset(false);
+  }
+};
   const downloadCSV = () => {
     if (filteredOutsets.length === 0) return;
     
@@ -761,9 +783,9 @@ export default function OutsetPage() {
       <OutboundHistoryTable
         outsetItems={outsetItems}
         filteredOutsets={filteredOutsets}
-        loading={loading.outsets}
+        loading={loading.outsets || deletingOutset}
+        onDeleteSuccess={handleDeleteOutset}
       />
-
       {/* Modals */}
       {showProductSelector && (
   <ProductSelector

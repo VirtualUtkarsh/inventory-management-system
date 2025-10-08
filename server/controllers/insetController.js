@@ -136,6 +136,7 @@ const createInset = async (req, res) => {
     });
   }
 };
+
 // Import inbound records from Excel
 const importInboundExcel = async (req, res) => {
   try {
@@ -208,7 +209,7 @@ const importInboundExcel = async (req, res) => {
       errorCount: results.errorCount,
       warnings: results.warnings,
       errors: results.errors,
-      stats: results.stats,          // contains successRate, createdBinsCount, warningCount
+      stats: results.stats,
       createdBins: results.createdBins,
       summary: results.summary
     });
@@ -338,25 +339,101 @@ const updateInset = async (req, res) => {
   }
 };
 
-// Delete inset
+// 🔴 NEW: Admin-only delete with inventory reversal
 const deleteInset = async (req, res) => {
   try {
+    console.log('=== INSET DELETION START ===');
     const { id } = req.params;
-    const deletedInset = await Inset.findByIdAndDelete(id);
 
-    if (!deletedInset) {
-      return res.status(404).json({ message: 'Inset not found' });
+    // Find the inset record first
+    const inset = await Inset.findById(id);
+    
+    if (!inset) {
+      return res.status(404).json({ message: 'Inbound record not found' });
     }
 
+    console.log('Found inset to delete:', {
+      id: inset._id,
+      skuId: inset.skuId,
+      bin: inset.bin,
+      quantity: inset.quantity
+    });
+
+    // Check current inventory for this SKU+bin
+    const inventoryItem = await Inventory.findOne({ 
+      skuId: inset.skuId, 
+      bin: inset.bin 
+    });
+
+    if (!inventoryItem) {
+      return res.status(400).json({ 
+        message: `Cannot delete: Inventory record not found for SKU ${inset.skuId} in bin ${inset.bin}`,
+        skuId: inset.skuId,
+        bin: inset.bin
+      });
+    }
+
+    // Calculate new quantity after reversal
+    const newQuantity = inventoryItem.quantity - inset.quantity;
+
+    // Validate: Don't allow deletion if it would make inventory negative
+    if (newQuantity < 0) {
+      return res.status(400).json({ 
+        message: `Cannot delete: Reversal would result in negative inventory. Current stock: ${inventoryItem.quantity}, Inbound quantity: ${inset.quantity}`,
+        currentStock: inventoryItem.quantity,
+        inboundQuantity: inset.quantity,
+        resultingStock: newQuantity
+      });
+    }
+
+    console.log('Inventory reversal check passed:', {
+      currentStock: inventoryItem.quantity,
+      removeAmount: inset.quantity,
+      newStock: newQuantity
+    });
+
+    // Reverse the inventory (subtract the inbound quantity)
+    const updatedInventory = await Inventory.updateStock(
+      inset.skuId,
+      -inset.quantity,  // Negative to subtract
+      inset.bin
+    );
+
+    console.log('✅ Inventory reversed successfully:', {
+      skuId: updatedInventory.skuId,
+      bin: updatedInventory.bin,
+      oldQuantity: inventoryItem.quantity,
+      newQuantity: updatedInventory.quantity
+    });
+
+    // Delete the inset record
+    await Inset.findByIdAndDelete(id);
+    console.log('✅ Inset record deleted');
+
+    console.log('=== INSET DELETION SUCCESS ===');
     res.status(200).json({ 
-      message: 'Inset deleted successfully', 
-      inset: deletedInset 
+      message: 'Inbound record deleted and inventory reversed successfully',
+      deletedInset: {
+        id: inset._id,
+        skuId: inset.skuId,
+        bin: inset.bin,
+        quantity: inset.quantity
+      },
+      inventoryUpdate: {
+        skuId: inset.skuId,
+        bin: inset.bin,
+        oldQuantity: inventoryItem.quantity,
+        newQuantity: updatedInventory.quantity,
+        reversed: inset.quantity
+      }
     });
 
   } catch (error) {
-    console.error('Delete inset error:', error);
+    console.error('=== INSET DELETION ERROR ===');
+    console.error('Error details:', error);
+    
     res.status(500).json({ 
-      message: 'Failed to delete inset', 
+      message: 'Failed to delete inbound record', 
       error: error.message 
     });
   }

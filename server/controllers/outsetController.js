@@ -418,6 +418,246 @@ const createBatchOutset = async (req, res) => {
   }
 };
 
+// ADD THESE TWO METHODS TO outsetController.js
+
+// 🔴 NEW: Admin-only delete single outset with inventory restoration
+const deleteOutset = async (req, res) => {
+  try {
+    console.log('=== OUTSET DELETION START ===');
+    const { id } = req.params;
+
+    // Find the outset record first
+    const outset = await Outset.findById(id);
+    
+    if (!outset) {
+      return res.status(404).json({ message: 'Outbound record not found' });
+    }
+
+    console.log('Found outset to delete:', {
+      id: outset._id,
+      skuId: outset.skuId,
+      bin: outset.bin,
+      quantity: outset.quantity,
+      customerName: outset.customerName,
+      invoiceNo: outset.invoiceNo
+    });
+
+    // Find current inventory for this SKU+bin
+    const inventoryItem = await Inventory.findOne({ 
+      skuId: outset.skuId, 
+      bin: outset.bin 
+    });
+
+    const oldQuantity = inventoryItem ? inventoryItem.quantity : 0;
+
+    console.log('Current inventory state:', {
+      skuId: outset.skuId,
+      bin: outset.bin,
+      currentStock: oldQuantity,
+      willRestore: outset.quantity
+    });
+
+    // Restore inventory (add back the outbound quantity)
+    const updatedInventory = await Inventory.updateStock(
+      outset.skuId,
+      outset.quantity,  // Positive to add back
+      outset.bin
+    );
+
+    console.log('✅ Inventory restored successfully:', {
+      skuId: updatedInventory.skuId,
+      bin: updatedInventory.bin,
+      oldQuantity: oldQuantity,
+      newQuantity: updatedInventory.quantity,
+      restored: outset.quantity
+    });
+
+    // Delete the outset record
+    await Outset.findByIdAndDelete(id);
+    console.log('✅ Outset record deleted');
+
+    // Create audit log for deletion
+    const auditLog = new AuditLog({
+      actionType: 'STOCK_INCREASE_DELETION',
+      collectionName: 'Outset',
+      documentId: outset._id,
+      changes: {
+        action: 'DELETE_OUTBOUND',
+        skuId: outset.skuId,
+        bin: outset.bin,
+        quantity: outset.quantity,
+        customerName: outset.customerName,
+        invoiceNo: outset.invoiceNo,
+        oldStock: oldQuantity,
+        newStock: updatedInventory.quantity,
+        restoredQuantity: outset.quantity
+      },
+      user: {
+        id: req.userId,
+        name: req.username
+      }
+    });
+    await auditLog.save();
+
+    console.log('=== OUTSET DELETION SUCCESS ===');
+    res.status(200).json({ 
+      message: 'Outbound record deleted and inventory restored successfully',
+      deletedOutset: {
+        id: outset._id,
+        skuId: outset.skuId,
+        bin: outset.bin,
+        quantity: outset.quantity,
+        customerName: outset.customerName,
+        invoiceNo: outset.invoiceNo
+      },
+      inventoryUpdate: {
+        skuId: outset.skuId,
+        bin: outset.bin,
+        oldQuantity: oldQuantity,
+        newQuantity: updatedInventory.quantity,
+        restored: outset.quantity
+      }
+    });
+
+  } catch (error) {
+    console.error('=== OUTSET DELETION ERROR ===');
+    console.error('Error details:', error);
+    
+    res.status(500).json({ 
+      message: 'Failed to delete outbound record', 
+      error: error.message 
+    });
+  }
+};
+
+// 🔴 NEW: Admin-only delete entire batch and restore all inventory
+const deleteBatchOutset = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    console.log('=== BATCH OUTSET DELETION START ===');
+    const { batchId } = req.params;
+
+    if (!batchId) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Batch ID is required' });
+    }
+
+    // Find all outsets in this batch
+    const batchItems = await Outset.find({ batchId: batchId }).session(session);
+
+    if (batchItems.length === 0) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Batch not found' });
+    }
+
+    console.log(`Found ${batchItems.length} items in batch ${batchId}`);
+
+    const restorationResults = [];
+    const auditLogs = [];
+
+    // Restore inventory for each item
+    for (const item of batchItems) {
+      try {
+        // Get current inventory
+        const inventoryItem = await Inventory.findOne({ 
+          skuId: item.skuId, 
+          bin: item.bin 
+        }).session(session);
+
+        const oldQuantity = inventoryItem ? inventoryItem.quantity : 0;
+
+        // Restore inventory
+        const updatedInventory = await Inventory.updateStock(
+          item.skuId,
+          item.quantity,  // Positive to restore
+          item.bin
+        );
+
+        restorationResults.push({
+          skuId: item.skuId,
+          bin: item.bin,
+          oldQuantity: oldQuantity,
+          newQuantity: updatedInventory.quantity,
+          restored: item.quantity,
+          success: true
+        });
+
+        // Create audit log
+        auditLogs.push({
+          actionType: 'BATCH_STOCK_INCREASE_DELETION',
+          collectionName: 'Outset',
+          documentId: item._id,
+          changes: {
+            action: 'DELETE_BATCH_OUTBOUND',
+            batchId: batchId,
+            skuId: item.skuId,
+            bin: item.bin,
+            quantity: item.quantity,
+            customerName: item.customerName,
+            invoiceNo: item.invoiceNo,
+            oldStock: oldQuantity,
+            newStock: updatedInventory.quantity,
+            restoredQuantity: item.quantity
+          },
+          user: {
+            id: req.userId,
+            name: req.username
+          }
+        });
+
+        console.log(`✓ Restored inventory for ${item.skuId} in ${item.bin}: +${item.quantity}`);
+
+      } catch (itemError) {
+        console.error(`Error restoring item:`, itemError);
+        await session.abortTransaction();
+        return res.status(500).json({
+          message: `Failed to restore inventory for ${item.skuId} in ${item.bin}`,
+          error: itemError.message
+        });
+      }
+    }
+
+    // Save all audit logs
+    if (auditLogs.length > 0) {
+      await AuditLog.insertMany(auditLogs, { session });
+    }
+
+    // Delete all outsets in batch
+    const deleteResult = await Outset.deleteMany({ batchId: batchId }).session(session);
+    console.log(`✅ Deleted ${deleteResult.deletedCount} outset records`);
+
+    await session.commitTransaction();
+
+    console.log('=== BATCH OUTSET DELETION SUCCESS ===');
+    res.status(200).json({
+      message: `Batch deleted successfully. ${batchItems.length} items restored to inventory.`,
+      batchId: batchId,
+      deletedItems: batchItems.length,
+      customerName: batchItems[0].customerName,
+      invoiceNo: batchItems[0].invoiceNo,
+      restorationResults: restorationResults,
+      summary: {
+        totalQuantityRestored: restorationResults.reduce((sum, r) => sum + r.restored, 0),
+        uniqueSkus: [...new Set(restorationResults.map(r => r.skuId))].length,
+        uniqueBins: [...new Set(restorationResults.map(r => r.bin))].length
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('=== BATCH OUTSET DELETION ERROR ===');
+    console.error('Error details:', error);
+
+    res.status(500).json({ 
+      message: 'Failed to delete batch outbound', 
+      error: error.message 
+    });
+  } finally {
+    session.endSession();
+  }
+};
 // Get all outsets (outbound history) - keep as is
 const getOutsets = async (req, res) => {
   try {
@@ -486,5 +726,7 @@ module.exports = {
   createOutset,
   createBatchOutset,
   getOutsets,
-  getBatchSummary
+  getBatchSummary,
+  deleteBatchOutset,
+  deleteOutset
 };
