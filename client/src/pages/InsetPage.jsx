@@ -4,6 +4,8 @@ import axiosInstance from '../utils/axiosInstance';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import ExcelImport from '../components/ExcelImport';
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import { Trash2 } from 'lucide-react'; // Add Trash2 to existing lucide-react import
 import { 
   Plus, 
   Search, 
@@ -32,7 +34,11 @@ const InsetPage = () => {
     bin: '',
     quantity: ''
   });
-
+  const [deletingInset, setDeletingInset] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    item: null
+  });
   const [insets, setInsets] = useState([]);
   const [filteredInsets, setFilteredInsets] = useState([]);
   const [bins, setBins] = useState([]);
@@ -417,7 +423,41 @@ const InsetPage = () => {
     printWindow.print();
     printWindow.close();
   };
+const handleDeleteClick = (inset) => {
+  setDeleteModal({
+    isOpen: true,
+    item: inset
+  });
+};
 
+const handleDeleteConfirm = async () => {
+  try {
+    setDeletingInset(true);
+    
+    const response = await axiosInstance.delete(`/api/insets/${deleteModal.item._id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    console.log('✅ Inset deleted:', response.data);
+    
+    toast.success(
+      `Inbound deleted! ${response.data.inventoryUpdate.reversed} units removed from bin ${response.data.inventoryUpdate.bin}`
+    );
+    
+    // Close modal and refresh data
+    setDeleteModal({ isOpen: false, item: null });
+    await fetchInsets();
+  } catch (error) {
+    console.error('❌ Delete error:', error);
+    toast.error(error.response?.data?.message || 'Failed to delete inbound record');
+  } finally {
+    setDeletingInset(false);
+  }
+};
+
+const handleDeleteCancel = () => {
+  setDeleteModal({ isOpen: false, item: null });
+};
   const totalInbound = insets.length;
   const totalQuantityAdded = insets.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const todayCount = insets.filter(item => {
@@ -874,6 +914,11 @@ const InsetPage = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added By</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Added</th>
+                    {user?.role === 'admin' && (
+  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+    Actions
+  </th>
+)}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -917,6 +962,19 @@ const InsetPage = () => {
                           })}
                         </div>
                       </td>
+                      {user?.role === 'admin' && (
+  <td className="px-6 py-4 whitespace-nowrap text-right">
+    <button
+      onClick={() => handleDeleteClick(inset)}
+      disabled={deletingInset}
+      className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+      title="Delete and reverse inventory"
+    >
+      <Trash2 className="w-4 h-4 mr-1" />
+      Delete
+    </button>
+  </td>
+)}
                     </tr>
                   ))}
                 </tbody>
@@ -952,6 +1010,31 @@ const InsetPage = () => {
           onImportComplete={handleImportComplete}
         />
       )}
+      {/* Delete Confirmation Modal */}
+<DeleteConfirmationModal
+  isOpen={deleteModal.isOpen}
+  onClose={handleDeleteCancel}
+  onConfirm={handleDeleteConfirm}
+  title="Delete Inbound Record"
+  message={
+    deleteModal.item ? (
+      <div className="space-y-2">
+        <p>Are you sure you want to delete this inbound record?</p>
+        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+          <p className="font-semibold text-yellow-900 mb-2">This will:</p>
+          <ul className="list-disc list-inside space-y-1 text-yellow-800">
+            <li>Delete the inbound record for <strong>{deleteModal.item.skuId}</strong></li>
+            <li>Remove <strong>{deleteModal.item.quantity}</strong> units from bin <strong>{deleteModal.item.bin}</strong></li>
+            <li>Update inventory accordingly</li>
+          </ul>
+        </div>
+        <p className="text-red-600 font-medium mt-3">This action cannot be undone!</p>
+      </div>
+    ) : ''
+  }
+  confirmText="Delete & Reverse Inventory"
+  isLoading={deletingInset}
+/>
     </div>
   );
 };

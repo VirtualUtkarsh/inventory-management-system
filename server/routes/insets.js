@@ -10,7 +10,7 @@ const {
   deleteInset,
   importInboundExcel 
 } = require('../controllers/insetController');
-const { auth } = require('../middleware/auth');
+const { auth, requireAdmin } = require('../middleware/auth');
 
 // Configure multer for file upload (memory storage)
 const upload = multer({
@@ -33,38 +33,35 @@ const upload = multer({
   }
 });
 
-// Apply authentication middleware to all routes
-router.use(auth);
-
 // @route   POST /api/insets
 // @desc    Create a new inset (inbound entry)
 // @access  Private
-router.post('/', createInset);
+router.post('/', auth, createInset);
 
 // @route   GET /api/insets  
 // @desc    Get all insets (inbound history)
 // @access  Private
-router.get('/', getAllInsets);
+router.get('/', auth, getAllInsets);
 
 // @route   GET /api/insets/:id
 // @desc    Get a specific inset by ID
 // @access  Private
-router.get('/:id', getInsetById);
+router.get('/:id', auth, getInsetById);
 
 // @route   PUT /api/insets/:id
 // @desc    Update a specific inset
 // @access  Private
-router.put('/:id', updateInset);
+router.put('/:id', auth, updateInset);
 
 // @route   DELETE /api/insets/:id
-// @desc    Delete a specific inset
-// @access  Private
-router.delete('/:id', deleteInset);
+// @desc    Delete a specific inset (ADMIN ONLY - reverses inventory)
+// @access  Private/Admin
+router.delete('/:id', auth, requireAdmin, deleteInset);
 
 // @route   POST /api/insets/import-excel
 // @desc    Import inbound records from Excel file
 // @access  Private
-router.post('/import-excel', upload.single('excelFile'), importInboundExcel);
+router.post('/import-excel', auth, upload.single('excelFile'), importInboundExcel);
 
 // Error handling middleware for multer
 router.use((error, req, res, next) => {

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import axiosInstance from '../utils/axiosInstance';
 import {
   Calendar,
   User,
@@ -6,17 +7,48 @@ import {
   ShoppingCart,
   Receipt,
   Package,
-  ShoppingBag,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 const OutboundHistoryTable = ({ 
   outsetItems, 
   filteredOutsets, 
-  loading = false 
+  loading = false,
+  onDeleteSuccess
 }) => {
+  const { user } = useAuth();
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    item: null,
+    isDeleting: false
+  });
+
   const getDisplaySku = (item) => {
     return item.skuId || item.sku || 'N/A';
+  };
+const [deletingOutset, setDeletingOutset] = useState(false);
+  const handleDeleteClick = (item) => {
+    setDeleteModal({
+      isOpen: true,
+      item: item,
+      isDeleting: false
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    // This will be handled by parent component
+    if (onDeleteSuccess) {
+      setDeleteModal(prev => ({ ...prev, isDeleting: true }));
+      await onDeleteSuccess(deleteModal.item._id);
+      setDeleteModal({ isOpen: false, item: null, isDeleting: false });
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModal({ isOpen: false, item: null, isDeleting: false });
   };
 
   if (loading && outsetItems.length === 0) {
@@ -48,96 +80,132 @@ const OutboundHistoryTable = ({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      {/* Table Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Outbound History</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              {filteredOutsets.length} records • Total quantity: {filteredOutsets.reduce((sum, item) => sum + (item.quantity || 0), 0)}
-            </p>
-          </div>
-          {loading && (
-            <div className="flex items-center text-sm text-blue-600">
-              <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-              Updating...
+    <>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Table Header */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Outbound History</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {filteredOutsets.length} records • Total quantity: {filteredOutsets.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+              </p>
             </div>
-          )}
+            {loading && (
+              <div className="flex items-center text-sm text-blue-600">
+                <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                Updating...
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date & Time
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  SKU ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Bin
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Quantity
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Customer
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Invoice
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Processed By
+                </th>
+                {user?.role === 'admin' && (
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredOutsets.map(item => (
+                <TableRow 
+                  key={item._id} 
+                  item={item} 
+                  getDisplaySku={getDisplaySku}
+                  isAdmin={user?.role === 'admin'}
+                  onDelete={handleDeleteClick}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table Footer */}
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
+            <div className="flex items-center space-x-6 text-sm text-gray-600">
+              <span className="flex items-center">
+                <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                Total Records: {filteredOutsets.length}
+              </span>
+              <span className="flex items-center">
+                <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                Total Shipped: {filteredOutsets.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+              </span>
+              <span className="flex items-center">
+                <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                Batch Records: {filteredOutsets.filter(item => item.batchId).length}
+              </span>
+              <span className="flex items-center">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                Single Records: {filteredOutsets.filter(item => !item.batchId).length}
+              </span>
+            </div>
+            
+            <div className="text-sm text-gray-500">
+              Last updated: {new Date().toLocaleTimeString()}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date & Time
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                SKU ID
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Bin
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Quantity
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Customer
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Invoice
-              </th>
-              {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Type
-              </th> */}
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Processed By
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredOutsets.map(item => (
-              <TableRow key={item._id} item={item} getDisplaySku={getDisplaySku} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Table Footer */}
-      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
-          <div className="flex items-center space-x-6 text-sm text-gray-600">
-            <span className="flex items-center">
-              <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-              Total Records: {filteredOutsets.length}
-            </span>
-            <span className="flex items-center">
-              <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
-              Total Shipped: {filteredOutsets.reduce((sum, item) => sum + (item.quantity || 0), 0)}
-            </span>
-            <span className="flex items-center">
-              <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-              Batch Records: {filteredOutsets.filter(item => item.batchId).length}
-            </span>
-            <span className="flex items-center">
-              <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-              Single Records: {filteredOutsets.filter(item => !item.batchId).length}
-            </span>
-          </div>
-          
-          <div className="text-sm text-gray-500">
-            Last updated: {new Date().toLocaleTimeString()}
-          </div>
-        </div>
-      </div>
-    </div>
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Outbound Record"
+        message={
+          deleteModal.item ? (
+            <div className="space-y-2">
+              <p>Are you sure you want to delete this outbound record?</p>
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+                <p className="font-semibold text-yellow-900 mb-2">This will:</p>
+                <ul className="list-disc list-inside space-y-1 text-yellow-800">
+                  <li>Delete the outbound record for <strong>{deleteModal.item.skuId}</strong></li>
+                  <li>Restore <strong>{deleteModal.item.quantity}</strong> units back to bin <strong>{deleteModal.item.bin}</strong></li>
+                  <li>Update inventory accordingly</li>
+                </ul>
+              </div>
+              <p className="text-red-600 font-medium mt-3">This action cannot be undone!</p>
+            </div>
+          ) : ''
+        }
+        confirmText="Delete & Restore Inventory"
+        isLoading={deleteModal.isDeleting}
+      />
+    </>
   );
 };
 
-const TableRow = ({ item, getDisplaySku }) => {
+const TableRow = ({ item, getDisplaySku, isAdmin, onDelete }) => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return {
@@ -223,34 +291,6 @@ const TableRow = ({ item, getDisplaySku }) => {
           </div>
         </div>
       </td>
-
-      {/* Type */}
-      {/* <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center space-x-2">
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            item.batchId 
-              ? 'bg-purple-100 text-purple-800' 
-              : 'bg-blue-100 text-blue-800'
-          }`}>
-            {item.batchId ? (
-              <>
-                <ShoppingBag className="w-3 h-3 mr-1" />
-                Batch
-              </>
-            ) : (
-              <>
-                <Package className="w-3 h-3 mr-1" />
-                Single
-              </>
-            )}
-          </span>
-          {item.batchId && (
-            <div className="text-xs text-gray-500" title={`Batch ID: ${item.batchId}`}>
-              #{item.batchId.slice(-6)}
-            </div>
-          )}
-        </div>
-      </td> */}
       
       {/* Processed By */}
       <td className="px-6 py-4 whitespace-nowrap">
@@ -271,6 +311,20 @@ const TableRow = ({ item, getDisplaySku }) => {
           </div>
         </div>
       </td>
+
+      {/* Admin Actions */}
+      {isAdmin && (
+        <td className="px-6 py-4 whitespace-nowrap text-right">
+          <button
+            onClick={() => onDelete(item)}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+            title="Delete and restore inventory"
+          >
+            <Trash2 className="w-4 h-4 mr-1" />
+            Delete
+          </button>
+        </td>
+      )}
     </tr>
   );
 };
