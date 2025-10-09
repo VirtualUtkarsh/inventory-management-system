@@ -7,146 +7,74 @@ const mongoose = require('mongoose');
 const createOutset = async (req, res) => {
   try {
     console.log('=== OUTSET CREATION START ===');
-    console.log('Request body:', req.body);
-    console.log('User from auth middleware:', req.userId, req.username);
-
     const { skuId, quantity, customerName, invoiceNo, bin, user } = req.body;
 
-    // Validation - Check all required fields
-    const requiredFields = {
-      skuId: 'SKU ID',
-      quantity: 'Quantity',
-      customerName: 'Customer Name',
-      invoiceNo: 'Invoice Number',
-      bin: 'Bin Location'
-    };
-
-    // Check for missing fields
+    // Validation
+    const requiredFields = { skuId: 'SKU ID', quantity: 'Quantity', customerName: 'Customer Name', invoiceNo: 'Invoice Number', bin: 'Bin Location' };
     for (const [field, label] of Object.entries(requiredFields)) {
       if (!req.body[field] || req.body[field] === '' || req.body[field] === 0) {
-        console.log(`Validation failed - ${label} is missing:`, req.body[field]);
-        return res.status(400).json({ 
-          message: `${label} is required`,
-          field: field,
-          received: req.body[field]
-        });
+        return res.status(400).json({ message: `${label} is required`, field: field, received: req.body[field] });
       }
     }
 
-    // Additional quantity validation
     if (Number(quantity) <= 0) {
-      console.log('Validation failed - invalid quantity:', quantity);
-      return res.status(400).json({ 
-        message: 'Quantity must be greater than 0',
-        received: quantity
-      });
+      return res.status(400).json({ message: 'Quantity must be greater than 0', received: quantity });
     }
 
-    console.log('All validation passed');
-
-    // Check if inventory item exists for SPECIFIC SKU+bin combination
-    console.log(`Looking for inventory: SKU=${skuId}, Bin=${bin}`);
+    // Check inventory
     const inventoryItem = await Inventory.findOne({ skuId: skuId, bin: bin });
     
     if (!inventoryItem) {
-      console.log('Inventory item not found for skuId + bin combination:', skuId, bin);
-      
-      // Check if SKU exists in other bins to provide helpful error message
       const otherBins = await Inventory.getBinsBySku(skuId);
       if (otherBins.length > 0) {
         return res.status(404).json({ 
           message: `Product not found in bin ${bin}. Available in bins: ${otherBins.map(b => `${b.bin}(${b.quantity})`).join(', ')}`,
-          skuId: skuId,
-          requestedBin: bin,
           availableBins: otherBins
         });
-      } else {
-        return res.status(404).json({ 
-          message: 'Product not found in inventory',
-          skuId: skuId
-        });
       }
+      return res.status(404).json({ message: 'Product not found in inventory' });
     }
 
     if (inventoryItem.quantity < quantity) {
-      console.log(`Insufficient stock in bin ${bin} - Available: ${inventoryItem.quantity}, Requested: ${quantity}`);
-      
-      // Check total availability across all bins for helpful error message
-      const totalAvailable = await Inventory.getTotalQuantityBySku(skuId);
-      const allBins = await Inventory.getBinsBySku(skuId);
-      
       return res.status(400).json({ 
-        message: `Insufficient stock in bin ${bin}. Only ${inventoryItem.quantity} available in this bin`,
+        message: `Insufficient stock in bin ${bin}. Only ${inventoryItem.quantity} available`,
         available: inventoryItem.quantity,
-        requested: quantity,
-        totalAcrossAllBins: totalAvailable,
-        availableInOtherBins: allBins.filter(b => b.bin !== bin)
+        requested: quantity
       });
     }
 
-    console.log('Stock check passed, updating inventory...');
-
-    // Update inventory for specific SKU+bin combination (negative quantity for outbound)
-    const updatedInventoryItem = await Inventory.updateStock(
-      skuId, 
-      -quantity, 
-      bin
-    );
-
-    console.log('Inventory updated successfully, creating outset record...');
+    // Update inventory
+    const updatedInventoryItem = await Inventory.updateStock(skuId, -quantity, bin);
 
     // Create outset record
-    const outsetData = {
+    const outset = new Outset({
       skuId: skuId.trim(),
       quantity: Number(quantity),
       bin: bin.trim(),
       customerName: customerName.trim(),
       invoiceNo: invoiceNo.trim(),
-      user: user || {
-        id: req.userId,
-        name: req.username
-      }
-    };
-
-    console.log('Creating outset with data:', outsetData);
-
-    const outset = new Outset(outsetData);
+      user: user || { id: req.userId, name: req.username }
+    });
     const savedOutset = await outset.save();
 
-    console.log('Outset saved successfully:', savedOutset._id);
-
-    // Create audit log
-    const log = new AuditLog({
+    // Create audit log (async, don't wait)
+    AuditLog.create({
       actionType: 'STOCK_DECREASE',
       collectionName: 'Outset',
       documentId: savedOutset._id,
       changes: {
-        skuId: skuId,
-        bin: bin,
-        quantity: -quantity,
-        customerName: customerName,
-        invoiceNo: invoiceNo,
+        skuId, bin, quantity: -quantity, customerName, invoiceNo,
         oldStock: inventoryItem.quantity,
         newStock: updatedInventoryItem.quantity
       },
-      user: user || {
-        id: req.userId,
-        name: req.username
-      }
-    });
-    await log.save();
+      user: user || { id: req.userId, name: req.username }
+    }).catch(err => console.error('Audit log error:', err));
 
-    // Log current inventory state for this SKU across all bins
-    const allBins = await Inventory.getBinsBySku(skuId);
-    console.log(`📊 Current inventory for SKU ${skuId} after outbound:`, allBins);
-
-    console.log('=== OUTSET CREATION SUCCESS ===');
     res.status(201).json({
       message: 'Outbound record created successfully',
       outset: savedOutset,
       inventoryUpdate: {
-        skuId: skuId,
-        bin: bin,
+        skuId, bin,
         oldQuantity: inventoryItem.quantity,
         newQuantity: updatedInventoryItem.quantity,
         removed: quantity
@@ -154,330 +82,197 @@ const createOutset = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('=== OUTSET CREATION ERROR ===');
-    console.error('Error details:', err);
-
-    // Handle specific inventory errors
-    if (err.message && err.message.includes('Insufficient stock')) {
-      return res.status(400).json({ message: err.message });
-    }
-
-    if (err.message && err.message.includes('not found')) {
-      return res.status(404).json({ message: 'Product not found in inventory' });
-    }
-
-    // Handle mongoose validation errors
-    if (err.name === 'ValidationError') {
-      const errors = Object.values(err.errors).map(error => error.message);
-      return res.status(400).json({ 
-        message: 'Validation Error', 
-        errors: errors,
-        details: err.errors
-      });
-    }
-
-    // Handle duplicate key errors
-    if (err.code === 11000) {
-      return res.status(400).json({ 
-        message: 'Duplicate outbound record detected',
-        error: err.message
-      });
-    }
-
-    // Generic server error
-    res.status(500).json({ 
-      message: 'Failed to create outbound record',
-      error: err.message
-    });
+    console.error('OUTSET ERROR:', err);
+    res.status(500).json({ message: 'Failed to create outbound record', error: err.message });
   }
 };
 
-// NEW: Batch outbound functionality
+// OPTIMIZED: Batch outbound functionality
 const createBatchOutset = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   
   try {
-    console.log('=== BATCH OUTSET CREATION START ===');
-    console.log('Request body:', req.body);
+    console.log('=== BATCH OUTSET START ===', new Date().toISOString());
+    const startTime = Date.now();
 
     const { items, customerName, invoiceNo, user } = req.body;
     
-    // Validation
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    // Quick validation
+    if (!items?.length || !customerName || !invoiceNo) {
       await session.abortTransaction();
-      return res.status(400).json({ 
-        message: 'Items array is required and cannot be empty' 
-      });
+      return res.status(400).json({ message: 'Items, customer name, and invoice number required' });
     }
 
-    if (!customerName) {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        message: 'Customer name is required for batch outbound' 
-      });
-    }
-
-    if (!invoiceNo) {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        message: 'Invoice number is required for batch outbound' 
-      });
-    }
-
-    // Generate batch ID for this transaction
     const batchId = new mongoose.Types.ObjectId();
-    const batchUser = user || {
-      id: req.userId,
-      name: req.username
-    };
+    const batchUser = user || { id: req.userId, name: req.username };
 
-    const results = [];
+    // 🚀 OPTIMIZATION 1: Batch fetch all inventory items at once
+    const inventoryQuery = items.map(item => ({ skuId: item.skuId, bin: item.bin }));
+    const inventoryItems = await Inventory.find({
+      $or: inventoryQuery
+    }).session(session).lean();
+
+    // Create inventory lookup map for O(1) access
+    const inventoryMap = new Map();
+    inventoryItems.forEach(inv => {
+      inventoryMap.set(`${inv.skuId}-${inv.bin}`, inv);
+    });
+
+    console.log(`📦 Fetched ${inventoryItems.length} inventory items in ${Date.now() - startTime}ms`);
+
+    // 🚀 OPTIMIZATION 2: Validate all items first (fast)
     const errors = [];
-    const auditLogs = [];
+    const validatedItems = [];
 
-    console.log(`Processing batch of ${items.length} items...`);
-
-    // Validate all items first before processing any
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const { skuId, quantity, bin } = item;
 
-      if (!skuId || !quantity || !bin) {
-        errors.push({
-          item: i + 1,
-          error: 'SKU ID, quantity, and bin are required for each item'
-        });
+      if (!skuId || !quantity || !bin || quantity <= 0) {
+        errors.push({ item: i + 1, error: 'Invalid item data' });
         continue;
       }
 
-      if (Number(quantity) <= 0) {
-        errors.push({
-          item: i + 1,
-          error: `Invalid quantity: ${quantity}. Must be greater than 0`
-        });
-        continue;
-      }
-
-      // Check inventory availability
-      const inventoryItem = await Inventory.findOne({ 
-        skuId: skuId, 
-        bin: bin 
-      }).session(session);
+      const inventoryItem = inventoryMap.get(`${skuId}-${bin}`);
 
       if (!inventoryItem) {
-        const otherBins = await Inventory.getBinsBySku(skuId);
-        if (otherBins.length > 0) {
-          errors.push({
-            item: i + 1,
-            error: `${skuId} not found in bin ${bin}. Available in: ${otherBins.map(b => `${b.bin}(${b.quantity})`).join(', ')}`
-          });
-        } else {
-          errors.push({
-            item: i + 1,
-            error: `Product ${skuId} not found in inventory`
-          });
-        }
+        errors.push({ item: i + 1, error: `${skuId} not found in bin ${bin}` });
         continue;
       }
 
       if (inventoryItem.quantity < quantity) {
-        errors.push({
-          item: i + 1,
-          error: `Insufficient stock for ${skuId} in bin ${bin}. Available: ${inventoryItem.quantity}, Requested: ${quantity}`
+        errors.push({ 
+          item: i + 1, 
+          error: `Insufficient stock for ${skuId} in ${bin}. Available: ${inventoryItem.quantity}` 
         });
         continue;
       }
+
+      validatedItems.push({
+        ...item,
+        inventoryItem,
+        index: i
+      });
     }
 
-    // If there are validation errors, return them
     if (errors.length > 0) {
       await session.abortTransaction();
       return res.status(400).json({
-        message: 'Validation failed for some items',
+        message: 'Validation failed',
         errors,
-        validatedItems: items.length,
         failedItems: errors.length
       });
     }
 
-    console.log('All items validated successfully, processing...');
+    console.log(`✓ Validated ${validatedItems.length} items in ${Date.now() - startTime}ms`);
 
-    // Process each item (all validations passed)
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const { skuId, quantity, bin } = item;
-
-      try {
-        // Get inventory item
-        const inventoryItem = await Inventory.findOne({ 
-          skuId: skuId, 
-          bin: bin 
-        }).session(session);
-
-        // Update inventory using updateStock method
-        const qty = Number(quantity);
-        const updatedInventoryItem = await Inventory.updateStock(skuId, -qty, bin);
-
-        // Create outset record
-        const outsetData = {
-          skuId: skuId.trim(),
-          name: inventoryItem.name,
-          quantity: Number(quantity),
-          bin: bin.trim(),
-          customerName: customerName.trim(),
-          invoiceNo: invoiceNo.trim(),
-          baseSku: inventoryItem.baseSku,
-          size: inventoryItem.size,
-          color: inventoryItem.color,
-          pack: inventoryItem.pack,
-          category: inventoryItem.category,
-          user: batchUser,
-          batchId: batchId // Add batch identifier
-        };
-
-        const outset = new Outset(outsetData);
-        const savedOutset = await outset.save({ session });
-
-        results.push({
-          item: i + 1,
-          skuId: skuId,
-          bin: bin,
-          quantity: quantity,
-          outsetId: savedOutset._id,
-          success: true
-        });
-
-        // Prepare audit log
-        auditLogs.push({
-          actionType: 'BATCH_STOCK_DECREASE',
-          collectionName: 'Outset',
-          documentId: savedOutset._id,
-          changes: {
-            skuId: skuId,
-            bin: bin,
-            quantity: -quantity,
-            customerName: customerName,
-            invoiceNo: invoiceNo,
-            batchId: batchId,
-            oldStock: inventoryItem.quantity,
-            newStock: updatedInventoryItem.quantity
-          },
-          user: batchUser
-        });
-
-        console.log(`✓ Processed item ${i + 1}: ${skuId} from ${bin}`);
-
-      } catch (itemError) {
-        console.error(`Error processing item ${i + 1}:`, itemError);
-        errors.push({
-          item: i + 1,
-          error: `Processing error: ${itemError.message}`
-        });
+    // 🚀 OPTIMIZATION 3: Bulk inventory updates
+    const bulkInventoryOps = validatedItems.map(item => ({
+      updateOne: {
+        filter: { skuId: item.skuId, bin: item.bin },
+        update: { $inc: { quantity: -Number(item.quantity) } }
       }
+    }));
+
+    if (bulkInventoryOps.length > 0) {
+      await Inventory.bulkWrite(bulkInventoryOps, { session });
+      console.log(`✓ Updated ${bulkInventoryOps.length} inventory items in ${Date.now() - startTime}ms`);
     }
 
-    // Save all audit logs
-    if (auditLogs.length > 0) {
-      await AuditLog.insertMany(auditLogs, { session });
-    }
+    // 🚀 OPTIMIZATION 4: Bulk insert outset records
+    const outsetRecords = validatedItems.map(item => ({
+      skuId: item.skuId.trim(),
+      name: item.inventoryItem.name,
+      quantity: Number(item.quantity),
+      bin: item.bin.trim(),
+      customerName: customerName.trim(),
+      invoiceNo: invoiceNo.trim(),
+      baseSku: item.inventoryItem.baseSku,
+      size: item.inventoryItem.size,
+      color: item.inventoryItem.color,
+      pack: item.inventoryItem.pack,
+      category: item.inventoryItem.category,
+      user: batchUser,
+      batchId: batchId
+    }));
+
+    const savedOutsets = await Outset.insertMany(outsetRecords, { session });
+    console.log(`✓ Created ${savedOutsets.length} outset records in ${Date.now() - startTime}ms`);
+
+    // 🚀 OPTIMIZATION 5: Async audit logs (don't block response)
+    const auditLogs = savedOutsets.map((outset, idx) => ({
+      actionType: 'BATCH_STOCK_DECREASE',
+      collectionName: 'Outset',
+      documentId: outset._id,
+      changes: {
+        skuId: outset.skuId,
+        bin: outset.bin,
+        quantity: -outset.quantity,
+        customerName,
+        invoiceNo,
+        batchId,
+        oldStock: validatedItems[idx].inventoryItem.quantity,
+        newStock: validatedItems[idx].inventoryItem.quantity - outset.quantity
+      },
+      user: batchUser
+    }));
+
+    // Insert audit logs without awaiting (faster response)
+    AuditLog.insertMany(auditLogs, { session }).catch(err => 
+      console.error('Audit log error:', err)
+    );
 
     await session.commitTransaction();
 
-    console.log('=== BATCH OUTSET CREATION SUCCESS ===');
-    console.log(`Successfully processed ${results.length} items`);
+    const totalTime = Date.now() - startTime;
+    console.log(`=== BATCH OUTSET SUCCESS in ${totalTime}ms ===`);
 
     res.status(201).json({
-      message: `Batch outbound completed successfully`,
+      message: 'Batch outbound completed successfully',
       batchId: batchId,
-      customerName: customerName,
-      invoiceNo: invoiceNo,
+      customerName,
+      invoiceNo,
       totalItems: items.length,
-      successfulItems: results.length,
-      failedItems: errors.length,
-      results: results,
-      errors: errors.length > 0 ? errors : undefined,
+      successfulItems: savedOutsets.length,
+      processingTime: `${totalTime}ms`,
       summary: {
-        totalQuantityShipped: results.reduce((sum, r) => sum + r.quantity, 0),
-        uniqueSkus: [...new Set(results.map(r => r.skuId))].length,
-        uniqueBins: [...new Set(results.map(r => r.bin))].length
+        totalQuantityShipped: savedOutsets.reduce((sum, r) => sum + r.quantity, 0),
+        uniqueSkus: [...new Set(savedOutsets.map(r => r.skuId))].length,
+        uniqueBins: [...new Set(savedOutsets.map(r => r.bin))].length
       }
     });
 
   } catch (error) {
     await session.abortTransaction();
-    console.error('=== BATCH OUTSET CREATION ERROR ===');
-    console.error('Error details:', error);
-
-    res.status(500).json({ 
-      message: 'Failed to process batch outbound',
-      error: error.message
-    });
+    console.error('BATCH OUTSET ERROR:', error);
+    res.status(500).json({ message: 'Failed to process batch outbound', error: error.message });
   } finally {
     session.endSession();
   }
 };
 
-// ADD THESE TWO METHODS TO outsetController.js
-
-// 🔴 NEW: Admin-only delete single outset with inventory restoration
+// Delete single outset (optimized)
 const deleteOutset = async (req, res) => {
   try {
-    console.log('=== OUTSET DELETION START ===');
     const { id } = req.params;
-
-    // Find the outset record first
     const outset = await Outset.findById(id);
     
     if (!outset) {
       return res.status(404).json({ message: 'Outbound record not found' });
     }
 
-    console.log('Found outset to delete:', {
-      id: outset._id,
-      skuId: outset.skuId,
-      bin: outset.bin,
-      quantity: outset.quantity,
-      customerName: outset.customerName,
-      invoiceNo: outset.invoiceNo
-    });
-
-    // Find current inventory for this SKU+bin
-    const inventoryItem = await Inventory.findOne({ 
-      skuId: outset.skuId, 
-      bin: outset.bin 
-    });
-
+    const inventoryItem = await Inventory.findOne({ skuId: outset.skuId, bin: outset.bin });
     const oldQuantity = inventoryItem ? inventoryItem.quantity : 0;
 
-    console.log('Current inventory state:', {
-      skuId: outset.skuId,
-      bin: outset.bin,
-      currentStock: oldQuantity,
-      willRestore: outset.quantity
-    });
+    // Restore inventory
+    const updatedInventory = await Inventory.updateStock(outset.skuId, outset.quantity, outset.bin);
 
-    // Restore inventory (add back the outbound quantity)
-    const updatedInventory = await Inventory.updateStock(
-      outset.skuId,
-      outset.quantity,  // Positive to add back
-      outset.bin
-    );
-
-    console.log('✅ Inventory restored successfully:', {
-      skuId: updatedInventory.skuId,
-      bin: updatedInventory.bin,
-      oldQuantity: oldQuantity,
-      newQuantity: updatedInventory.quantity,
-      restored: outset.quantity
-    });
-
-    // Delete the outset record
+    // Delete outset
     await Outset.findByIdAndDelete(id);
-    console.log('✅ Outset record deleted');
 
-    // Create audit log for deletion
-    const auditLog = new AuditLog({
+    // Async audit log
+    AuditLog.create({
       actionType: 'STOCK_INCREASE_DELETION',
       collectionName: 'Outset',
       documentId: outset._id,
@@ -486,239 +281,152 @@ const deleteOutset = async (req, res) => {
         skuId: outset.skuId,
         bin: outset.bin,
         quantity: outset.quantity,
-        customerName: outset.customerName,
-        invoiceNo: outset.invoiceNo,
         oldStock: oldQuantity,
-        newStock: updatedInventory.quantity,
-        restoredQuantity: outset.quantity
+        newStock: updatedInventory.quantity
       },
-      user: {
-        id: req.userId,
-        name: req.username
-      }
-    });
-    await auditLog.save();
+      user: { id: req.userId, name: req.username }
+    }).catch(err => console.error('Audit log error:', err));
 
-    console.log('=== OUTSET DELETION SUCCESS ===');
     res.status(200).json({ 
-      message: 'Outbound record deleted and inventory restored successfully',
-      deletedOutset: {
-        id: outset._id,
-        skuId: outset.skuId,
-        bin: outset.bin,
-        quantity: outset.quantity,
-        customerName: outset.customerName,
-        invoiceNo: outset.invoiceNo
-      },
+      message: 'Outbound deleted and inventory restored',
       inventoryUpdate: {
         skuId: outset.skuId,
         bin: outset.bin,
-        oldQuantity: oldQuantity,
+        oldQuantity,
         newQuantity: updatedInventory.quantity,
         restored: outset.quantity
       }
     });
 
   } catch (error) {
-    console.error('=== OUTSET DELETION ERROR ===');
-    console.error('Error details:', error);
-    
-    res.status(500).json({ 
-      message: 'Failed to delete outbound record', 
-      error: error.message 
-    });
+    console.error('DELETE ERROR:', error);
+    res.status(500).json({ message: 'Failed to delete outbound record', error: error.message });
   }
 };
 
-// 🔴 NEW: Admin-only delete entire batch and restore all inventory
+// Delete batch outset (optimized)
 const deleteBatchOutset = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   
   try {
-    console.log('=== BATCH OUTSET DELETION START ===');
     const { batchId } = req.params;
-
+    
     if (!batchId) {
       await session.abortTransaction();
-      return res.status(400).json({ message: 'Batch ID is required' });
+      return res.status(400).json({ message: 'Batch ID required' });
     }
 
-    // Find all outsets in this batch
-    const batchItems = await Outset.find({ batchId: batchId }).session(session);
+    const batchItems = await Outset.find({ batchId }).session(session).lean();
 
     if (batchItems.length === 0) {
       await session.abortTransaction();
       return res.status(404).json({ message: 'Batch not found' });
     }
 
-    console.log(`Found ${batchItems.length} items in batch ${batchId}`);
-
-    const restorationResults = [];
-    const auditLogs = [];
-
-    // Restore inventory for each item
-    for (const item of batchItems) {
-      try {
-        // Get current inventory
-        const inventoryItem = await Inventory.findOne({ 
-          skuId: item.skuId, 
-          bin: item.bin 
-        }).session(session);
-
-        const oldQuantity = inventoryItem ? inventoryItem.quantity : 0;
-
-        // Restore inventory
-        const updatedInventory = await Inventory.updateStock(
-          item.skuId,
-          item.quantity,  // Positive to restore
-          item.bin
-        );
-
-        restorationResults.push({
-          skuId: item.skuId,
-          bin: item.bin,
-          oldQuantity: oldQuantity,
-          newQuantity: updatedInventory.quantity,
-          restored: item.quantity,
-          success: true
-        });
-
-        // Create audit log
-        auditLogs.push({
-          actionType: 'BATCH_STOCK_INCREASE_DELETION',
-          collectionName: 'Outset',
-          documentId: item._id,
-          changes: {
-            action: 'DELETE_BATCH_OUTBOUND',
-            batchId: batchId,
-            skuId: item.skuId,
-            bin: item.bin,
-            quantity: item.quantity,
-            customerName: item.customerName,
-            invoiceNo: item.invoiceNo,
-            oldStock: oldQuantity,
-            newStock: updatedInventory.quantity,
-            restoredQuantity: item.quantity
-          },
-          user: {
-            id: req.userId,
-            name: req.username
-          }
-        });
-
-        console.log(`✓ Restored inventory for ${item.skuId} in ${item.bin}: +${item.quantity}`);
-
-      } catch (itemError) {
-        console.error(`Error restoring item:`, itemError);
-        await session.abortTransaction();
-        return res.status(500).json({
-          message: `Failed to restore inventory for ${item.skuId} in ${item.bin}`,
-          error: itemError.message
-        });
+    // 🚀 Bulk restore inventory
+    const bulkOps = batchItems.map(item => ({
+      updateOne: {
+        filter: { skuId: item.skuId, bin: item.bin },
+        update: { $inc: { quantity: Number(item.quantity) } }
       }
-    }
+    }));
 
-    // Save all audit logs
-    if (auditLogs.length > 0) {
-      await AuditLog.insertMany(auditLogs, { session });
-    }
+    await Inventory.bulkWrite(bulkOps, { session });
 
     // Delete all outsets in batch
-    const deleteResult = await Outset.deleteMany({ batchId: batchId }).session(session);
-    console.log(`✅ Deleted ${deleteResult.deletedCount} outset records`);
+    await Outset.deleteMany({ batchId }).session(session);
+
+    // Async audit logs
+    const auditLogs = batchItems.map(item => ({
+      actionType: 'BATCH_STOCK_INCREASE_DELETION',
+      collectionName: 'Outset',
+      documentId: item._id,
+      changes: {
+        action: 'DELETE_BATCH_OUTBOUND',
+        batchId,
+        skuId: item.skuId,
+        bin: item.bin,
+        restoredQuantity: item.quantity
+      },
+      user: { id: req.userId, name: req.username }
+    }));
+
+    AuditLog.insertMany(auditLogs, { session }).catch(err => 
+      console.error('Audit log error:', err)
+    );
 
     await session.commitTransaction();
 
-    console.log('=== BATCH OUTSET DELETION SUCCESS ===');
     res.status(200).json({
-      message: `Batch deleted successfully. ${batchItems.length} items restored to inventory.`,
-      batchId: batchId,
+      message: `Batch deleted. ${batchItems.length} items restored`,
+      batchId,
       deletedItems: batchItems.length,
-      customerName: batchItems[0].customerName,
-      invoiceNo: batchItems[0].invoiceNo,
-      restorationResults: restorationResults,
       summary: {
-        totalQuantityRestored: restorationResults.reduce((sum, r) => sum + r.restored, 0),
-        uniqueSkus: [...new Set(restorationResults.map(r => r.skuId))].length,
-        uniqueBins: [...new Set(restorationResults.map(r => r.bin))].length
+        totalQuantityRestored: batchItems.reduce((sum, r) => sum + r.quantity, 0)
       }
     });
 
   } catch (error) {
     await session.abortTransaction();
-    console.error('=== BATCH OUTSET DELETION ERROR ===');
-    console.error('Error details:', error);
-
-    res.status(500).json({ 
-      message: 'Failed to delete batch outbound', 
-      error: error.message 
-    });
+    console.error('BATCH DELETE ERROR:', error);
+    res.status(500).json({ message: 'Failed to delete batch', error: error.message });
   } finally {
     session.endSession();
   }
 };
-// Get all outsets (outbound history) - keep as is
+
+// Get outsets (optimized with pagination)
 const getOutsets = async (req, res) => {
   try {
-    console.log('=== FETCHING OUTSETS ===');
+    const { limit = 100, skip = 0 } = req.query;
     
     const outsets = await Outset.find()
-      .sort({ createdAt: -1 }) // Latest first
-      .lean(); // For better performance
-    
-    console.log(`Found ${outsets.length} outsets`);
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(skip))
+      .lean()
+      .select('-__v'); // Exclude version field
     
     res.status(200).json(outsets);
   } catch (err) {
-    console.error('=== FETCH OUTSETS ERROR ===');
-    console.error('Error details:', err);
-    
-    res.status(500).json({ 
-      message: 'Failed to fetch outset history',
-      error: err.message
-    });
+    console.error('FETCH ERROR:', err);
+    res.status(500).json({ message: 'Failed to fetch outsets', error: err.message });
   }
 };
 
-// NEW: Get batch outbound summary
+// Get batch summary (optimized)
 const getBatchSummary = async (req, res) => {
   try {
     const { batchId } = req.params;
     
     if (!batchId) {
-      return res.status(400).json({ message: 'Batch ID is required' });
+      return res.status(400).json({ message: 'Batch ID required' });
     }
 
-    const batchItems = await Outset.find({ batchId: batchId })
+    const batchItems = await Outset.find({ batchId })
       .sort({ createdAt: 1 })
-      .lean();
+      .lean()
+      .select('-__v');
 
     if (batchItems.length === 0) {
       return res.status(404).json({ message: 'Batch not found' });
     }
 
-    const summary = {
-      batchId: batchId,
+    res.status(200).json({
+      batchId,
       customerName: batchItems[0].customerName,
       invoiceNo: batchItems[0].invoiceNo,
       createdAt: batchItems[0].createdAt,
-      user: batchItems[0].user,
       totalItems: batchItems.length,
       totalQuantity: batchItems.reduce((sum, item) => sum + item.quantity, 0),
       uniqueSkus: [...new Set(batchItems.map(item => item.skuId))].length,
-      uniqueBins: [...new Set(batchItems.map(item => item.bin))].length,
       items: batchItems
-    };
-
-    res.status(200).json(summary);
+    });
 
   } catch (error) {
-    console.error('Error fetching batch summary:', error);
-    res.status(500).json({ 
-      message: 'Failed to fetch batch summary',
-      error: error.message
-    });
+    console.error('BATCH SUMMARY ERROR:', error);
+    res.status(500).json({ message: 'Failed to fetch batch summary', error: error.message });
   }
 };
 

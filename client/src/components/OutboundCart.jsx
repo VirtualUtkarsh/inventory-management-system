@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ShoppingCart,
   X,
@@ -25,6 +25,17 @@ const OutboundCart = ({
   const [invoiceNo, setInvoiceNo] = useState('');
   const [editingItemId, setEditingItemId] = useState(null);
 
+  // Sort cart items by bin location
+  const sortedCartItems = useMemo(() => {
+    return [...cartItems].sort((a, b) => {
+      // Natural sort for bin locations (e.g., A1, A2, A10, B1, B2)
+      return a.bin.localeCompare(b.bin, undefined, { 
+        numeric: true, 
+        sensitivity: 'base' 
+      });
+    });
+  }, [cartItems]);
+
   const cartSummary = {
     totalItems: cartItems.length,
     totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
@@ -42,7 +53,7 @@ const OutboundCart = ({
     }
 
     onProcessCart({
-      items: cartItems.map(item => ({
+      items: sortedCartItems.map(item => ({
         skuId: item.skuId,
         bin: item.bin,
         quantity: item.quantity
@@ -61,13 +72,13 @@ const OutboundCart = ({
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <ShoppingCart className="w-6 h-6 text-blue-600 mr-3 -mt-6" />
+              <ShoppingCart className="w-6 h-6 text-blue-600 mr-3" />
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
                   Outbound Cart ({cartItems.length})
                 </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Review items and complete outbound
+                  Review items and complete outbound (sorted by bin)
                 </p>
               </div>
             </div>
@@ -125,7 +136,7 @@ const OutboundCart = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium text-gray-900">
-                    Items ({cartItems.length})
+                    Items ({cartItems.length}) - Sorted by Bin
                   </h3>
                   {cartItems.length > 0 && (
                     <button
@@ -138,7 +149,7 @@ const OutboundCart = ({
                   )}
                 </div>
 
-                {cartItems.map((item) => (
+                {sortedCartItems.map((item) => (
                   <CartItem
                     key={item.id}
                     item={item}
@@ -272,7 +283,7 @@ const CartItem = ({
           </div>
           <div className="flex items-center">
             <MapPin className="w-4 h-4 text-gray-500 mr-1" />
-            <span className="text-sm text-gray-600">{item.bin}</span>
+            <span className="text-sm text-gray-600 font-mono font-semibold">{item.bin}</span>
           </div>
         </div>
         
@@ -304,9 +315,9 @@ const CartItem = ({
               <button
                 onClick={handleConfirmEdit}
                 disabled={disabled}
-                className="p-1 text-green-600 hover:bg-green-100 disabled:text-green-400 rounded transition-colors -mt-3"
+                className="p-1 text-green-600 hover:bg-green-100 disabled:text-green-400 rounded transition-colors"
               >
-                <Check className="w-7 h-7" />
+                <Check className="w-4 h-4" />
               </button>
               <button
                 onClick={() => {
@@ -314,16 +325,16 @@ const CartItem = ({
                   onCancelEdit();
                 }}
                 disabled={disabled}
-                className="p-1 text-red-500 hover:bg-red-100 disabled:text-gray-400 rounded transition-colors -mt-3"
+                className="p-1 text-gray-500 hover:bg-gray-100 disabled:text-gray-400 rounded transition-colors"
               >
-                <X className="w-7 h-7" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           ) : (
             <button
               onClick={onEdit}
               disabled={disabled}
-              className="flex items-center space-x-1 px-3 py-2 text-base font-medium text-gray-700 bg-gray-100 hover:bg-gray-300 disabled:bg-gray-50 disabled:text-gray-400 rounded transition-colors"
+              className="flex items-center space-x-1 px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded transition-colors"
             >
               <span>Qty: {item.quantity}</span>
               <Edit2 className="w-3 h-3" />
