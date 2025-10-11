@@ -3,7 +3,8 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const { 
-  createInset, 
+  createInset,
+  createBatchInset, // 🚀 ADD THIS
   getAllInsets, 
   getInsetById, 
   updateInset, 
@@ -32,6 +33,12 @@ const upload = multer({
     }
   }
 });
+
+// 🚀 IMPORTANT: Batch route MUST come BEFORE single route!
+// @route   POST /api/insets/batch
+// @desc    Create multiple inbound entries in one transaction
+// @access  Private
+router.post('/batch', auth, createBatchInset);
 
 // @route   POST /api/insets
 // @desc    Create a new inset (inbound entry)
