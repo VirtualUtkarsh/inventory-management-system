@@ -66,6 +66,7 @@ InventorymgmtV1
 │       ├── setupTests.js
 │       ├── components
 │       │   ├── ExcelImport.jsx
+│       │   ├── InboundCart.jsx                    
 │       │   ├── InventoryTable.jsx
 │       │   ├── Layout.jsx
 │       │   ├── Navigation.jsx
@@ -77,11 +78,12 @@ InventorymgmtV1
 │       ├── context
 │       │   └── AuthContext.jsx
 │       ├── hooks
+│       │   ├── useInboundCart.js                  
 │       │   ├── useOutboundCart.js
 │       │   └── useTableFilter.js
 │       ├── pages
 │       │   ├── AdminDashboard.jsx
-│       │   ├── InsetPage.jsx
+│       │   ├── InsetPage.jsx                      
 │       │   ├── InventoryPage.jsx
 │       │   ├── LoginPage.jsx
 │       │   ├── OutsetPage.jsx
@@ -100,7 +102,7 @@ InventorymgmtV1
     │   └── db.js
     ├── controllers
     │   ├── adminController.js
-    │   ├── insetController.js
+    │   ├── insetController.js                     
     │   ├── inventoryController.js
     │   ├── metadataController.js
     │   ├── outsetController.js
@@ -127,7 +129,7 @@ InventorymgmtV1
     │   ├── admin.js
     │   ├── api.js
     │   ├── auth.js
-    │   ├── insets.js
+    │   ├── insets.js                              
     │   ├── inventory.js
     │   ├── metadata.js
     │   └── outset.js

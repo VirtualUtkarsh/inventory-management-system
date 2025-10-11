@@ -1,53 +1,135 @@
-// server/controllers/insetController.js
+// server/controllers/insetController.js - OPTIMIZED VERSION
 const Inset = require('../models/Inset');
 const Inventory = require('../models/Inventory');
 const InboundExcelImportService = require('../utils/InboundExcelImportService');
+const mongoose = require('mongoose');
 
-// Create a new inset (inbound entry)
+// 🚀 NEW: Batch inbound creation (like batch outbound)
+const createBatchInset = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    const startTime = Date.now();
+    const { items, user } = req.body;
+    
+    // Quick validation
+    if (!items?.length) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Items array is required' });
+    }
+
+    const batchId = new mongoose.Types.ObjectId();
+    const batchUser = user || { id: req.userId, name: req.username };
+
+    // Validate all items first
+    const errors = [];
+    const validatedItems = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const { skuId, bin, quantity } = item;
+
+      if (!skuId || !bin || !quantity || quantity <= 0) {
+        errors.push({ item: i + 1, error: 'Invalid item data' });
+        continue;
+      }
+
+      validatedItems.push({
+        skuId: skuId.trim().toUpperCase(),
+        bin: bin.trim().toUpperCase(),
+        quantity: Number(quantity),
+        index: i
+      });
+    }
+
+    if (errors.length > 0) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors,
+        failedItems: errors.length
+      });
+    }
+
+    // 🚀 Bulk inventory updates
+    const bulkInventoryOps = validatedItems.map(item => ({
+      updateOne: {
+        filter: { skuId: item.skuId, bin: item.bin },
+        update: { 
+          $inc: { quantity: item.quantity },
+          $set: { lastUpdated: Date.now() }
+        },
+        upsert: true
+      }
+    }));
+
+    if (bulkInventoryOps.length > 0) {
+      await Inventory.bulkWrite(bulkInventoryOps, { session });
+    }
+
+    // 🚀 Bulk insert inset records
+    const insetRecords = validatedItems.map(item => ({
+      skuId: item.skuId,
+      bin: item.bin,
+      quantity: item.quantity,
+      user: batchUser,
+      batchId: batchId
+    }));
+
+    const savedInsets = await Inset.insertMany(insetRecords, { session });
+
+    await session.commitTransaction();
+
+    const totalTime = Date.now() - startTime;
+
+    res.status(201).json({
+      message: 'Batch inbound completed successfully',
+      batchId: batchId,
+      totalItems: items.length,
+      successfulItems: savedInsets.length,
+      processingTime: `${totalTime}ms`,
+      summary: {
+        totalQuantityAdded: savedInsets.reduce((sum, r) => sum + r.quantity, 0),
+        uniqueSkus: [...new Set(savedInsets.map(r => r.skuId))].length,
+        uniqueBins: [...new Set(savedInsets.map(r => r.bin))].length
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('BATCH INSET ERROR:', error);
+    res.status(500).json({ 
+      message: 'Failed to process batch inbound', 
+      error: error.message 
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// Optimized single inset (reduced logging for production)
 const createInset = async (req, res) => {
   try {
-    console.log('=== INSET CREATION START ===');
-    console.log('Request body:', req.body);
-    console.log('User from auth middleware:', req.userId, req.username);
+    const { skuId, bin, quantity, user } = req.body;
 
-    // Extract data from request body - only simplified fields
-    const { 
-      skuId, 
-      bin, 
-      quantity, 
-      user 
-    } = req.body;
-
-    // Validation - Check only required simplified fields
-    const requiredFields = {
-      skuId: 'SKU ID',
-      bin: 'Bin Location',
-      quantity: 'Quantity'
-    };
-
+    // Validation
+    const requiredFields = { skuId: 'SKU ID', bin: 'Bin Location', quantity: 'Quantity' };
     for (const [field, label] of Object.entries(requiredFields)) {
       if (!req.body[field] || req.body[field] === '' || req.body[field] === 0) {
-        console.log(`❌ Validation failed - ${label} is missing:`, req.body[field]);
         return res.status(400).json({ 
           message: `${label} is required`,
-          field: field,
-          received: req.body[field]
+          field: field
         });
       }
     }
 
-    // Quantity validation
     if (Number(quantity) <= 0) {
-      console.log('❌ Validation failed - invalid quantity:', quantity);
       return res.status(400).json({ 
-        message: 'Quantity must be greater than 0',
-        received: quantity
+        message: 'Quantity must be greater than 0'
       });
     }
 
-    console.log('✅ All validation passed');
-
-    // Create inset document with simplified structure
     const insetData = {
       skuId: skuId.trim().toUpperCase(),
       bin: bin.trim().toUpperCase(),
@@ -58,81 +140,44 @@ const createInset = async (req, res) => {
       }
     };
 
-    console.log('Creating inset with data:', insetData);
-
     const inset = new Inset(insetData);
     const savedInset = await inset.save();
-    
-    console.log('✅ Inset saved successfully:', savedInset._id);
-    console.log('SKU ID:', savedInset.skuId, 'Bin:', savedInset.bin);
 
-    // Update inventory - FIXED to handle SKU+bin combinations properly
-    try {
-      console.log('📦 Updating inventory...');
-      console.log(`Looking for existing inventory: SKU=${savedInset.skuId}, Bin=${savedInset.bin}`);
-      
-      const inventoryItem = await Inventory.updateStock(
-        savedInset.skuId,
-        savedInset.quantity,
-        savedInset.bin
-      );
-      
-      console.log('✅ Inventory updated:', {
+    // Update inventory
+    const inventoryItem = await Inventory.updateStock(
+      savedInset.skuId,
+      savedInset.quantity,
+      savedInset.bin
+    );
+
+    res.status(201).json({
+      message: 'Inset recorded successfully',
+      inset: savedInset,
+      inventoryUpdate: {
         skuId: inventoryItem.skuId,
         bin: inventoryItem.bin,
         quantity: inventoryItem.quantity
-      });
-      
-      // Log current inventory state for this SKU across all bins
-      const allBins = await Inventory.getBinsBySku(savedInset.skuId);
-      console.log(`📊 Current inventory for SKU ${savedInset.skuId}:`, allBins);
-      
-    } catch (invError) {
-      console.error('❌ Failed to update inventory:', invError.message);
-      // Continue with inset creation even if inventory update fails
-      console.log('⚠️  Inset recorded but inventory update failed');
-    }
-
-    console.log('=== INSET CREATION SUCCESS ===');
-    res.status(201).json({
-      message: 'Inset recorded successfully',
-      inset: savedInset
+      }
     });
 
   } catch (error) {
-    console.error('=== INSET CREATION ERROR ===');
-    console.error('Error details:', error);
-
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ 
         message: 'Validation Error', 
-        errors: errors,
-        details: error.errors
+        errors: errors
       });
     }
 
     if (error.code === 11000) {
-      // Handle duplicate key error - could be from inset or inventory
-      const duplicateField = Object.keys(error.keyPattern || {})[0];
-      if (duplicateField) {
-        return res.status(400).json({ 
-          message: `A record with this ${duplicateField} already exists`,
-          duplicateField: duplicateField,
-          value: error.keyValue[duplicateField]
-        });
-      } else {
-        return res.status(400).json({ 
-          message: 'Duplicate record detected. This SKU+bin combination may already exist.',
-          error: error.message
-        });
-      }
+      return res.status(400).json({ 
+        message: 'Duplicate record detected'
+      });
     }
 
     res.status(500).json({ 
       message: 'Server Error during inset creation',
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     });
   }
 };
@@ -140,21 +185,12 @@ const createInset = async (req, res) => {
 // Import inbound records from Excel
 const importInboundExcel = async (req, res) => {
   try {
-    console.log('=== INBOUND EXCEL IMPORT START ===');
-    console.log('User:', req.userId, req.username);
-
     if (!req.file) {
       return res.status(400).json({
         success: false,
         message: 'No Excel file uploaded. Please select a file.'
       });
     }
-
-    console.log('📄 File received:', {
-      filename: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype
-    });
 
     const allowedMimeTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -177,15 +213,7 @@ const importInboundExcel = async (req, res) => {
     }
 
     const importService = new InboundExcelImportService(req.userId, req.username);
-    console.log('🚀 Starting Excel processing...');
     const results = await importService.importInboundExcel(req.file.buffer);
-
-    console.log('📊 Import completed:', {
-      totalRows: results.totalRows,
-      successCount: results.successCount,
-      errorCount: results.errorCount,
-      warningCount: results.warnings.length
-    });
 
     let statusCode = 200;
     let success = true;
@@ -197,7 +225,6 @@ const importInboundExcel = async (req, res) => {
       statusCode = 207;
     }
 
-    // ✅ Flattened response for frontend
     res.status(statusCode).json({
       success,
       message: success
@@ -214,12 +241,7 @@ const importInboundExcel = async (req, res) => {
       summary: results.summary
     });
 
-    console.log('=== INBOUND EXCEL IMPORT END ===');
-
   } catch (error) {
-    console.error('=== INBOUND EXCEL IMPORT ERROR ===');
-    console.error('Error details:', error);
-
     res.status(500).json({
       success: false,
       message: 'Failed to process Excel file',
@@ -237,16 +259,20 @@ const importInboundExcel = async (req, res) => {
   }
 };
 
-// Get all insets
+// Get all insets (with pagination support)
 const getAllInsets = async (req, res) => {
   try {
+    const { limit = 100, skip = 0 } = req.query;
+    
     const insets = await Inset.find()
       .sort({ createdAt: -1 })
-      .lean();
+      .limit(parseInt(limit))
+      .skip(parseInt(skip))
+      .lean()
+      .select('-__v');
 
     res.status(200).json(insets);
   } catch (error) {
-    console.error('Get insets error:', error);
     res.status(500).json({ 
       message: 'Failed to fetch insets', 
       error: error.message 
@@ -266,7 +292,6 @@ const getInsetById = async (req, res) => {
 
     res.status(200).json(inset);
   } catch (error) {
-    console.error('Get inset by ID error:', error);
     res.status(500).json({ 
       message: 'Failed to fetch inset', 
       error: error.message 
@@ -280,7 +305,6 @@ const updateInset = async (req, res) => {
     const { id } = req.params;
     const { skuId, bin, quantity } = req.body;
 
-    // Validation
     if (!skuId || !bin || !quantity) {
       return res.status(400).json({ 
         message: 'SKU ID, bin location, and quantity are required' 
@@ -300,10 +324,7 @@ const updateInset = async (req, res) => {
         bin: bin.trim().toUpperCase(),
         quantity: Number(quantity)
       },
-      { 
-        new: true, 
-        runValidators: true 
-      }
+      { new: true, runValidators: true }
     );
 
     if (!updatedInset) {
@@ -316,8 +337,6 @@ const updateInset = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update inset error:', error);
-    
     if (error.code === 11000) {
       return res.status(400).json({ 
         message: 'This record combination already exists.' 
@@ -339,27 +358,16 @@ const updateInset = async (req, res) => {
   }
 };
 
-// 🔴 NEW: Admin-only delete with inventory reversal
+// Delete inset (with inventory reversal)
 const deleteInset = async (req, res) => {
   try {
-    console.log('=== INSET DELETION START ===');
     const { id } = req.params;
-
-    // Find the inset record first
     const inset = await Inset.findById(id);
     
     if (!inset) {
       return res.status(404).json({ message: 'Inbound record not found' });
     }
 
-    console.log('Found inset to delete:', {
-      id: inset._id,
-      skuId: inset.skuId,
-      bin: inset.bin,
-      quantity: inset.quantity
-    });
-
-    // Check current inventory for this SKU+bin
     const inventoryItem = await Inventory.findOne({ 
       skuId: inset.skuId, 
       bin: inset.bin 
@@ -367,50 +375,28 @@ const deleteInset = async (req, res) => {
 
     if (!inventoryItem) {
       return res.status(400).json({ 
-        message: `Cannot delete: Inventory record not found for SKU ${inset.skuId} in bin ${inset.bin}`,
-        skuId: inset.skuId,
-        bin: inset.bin
+        message: `Cannot delete: Inventory record not found for SKU ${inset.skuId} in bin ${inset.bin}`
       });
     }
 
-    // Calculate new quantity after reversal
     const newQuantity = inventoryItem.quantity - inset.quantity;
 
-    // Validate: Don't allow deletion if it would make inventory negative
     if (newQuantity < 0) {
       return res.status(400).json({ 
-        message: `Cannot delete: Reversal would result in negative inventory. Current stock: ${inventoryItem.quantity}, Inbound quantity: ${inset.quantity}`,
+        message: `Cannot delete: Reversal would result in negative inventory. Current stock: ${inventoryItem.quantity}`,
         currentStock: inventoryItem.quantity,
-        inboundQuantity: inset.quantity,
-        resultingStock: newQuantity
+        inboundQuantity: inset.quantity
       });
     }
 
-    console.log('Inventory reversal check passed:', {
-      currentStock: inventoryItem.quantity,
-      removeAmount: inset.quantity,
-      newStock: newQuantity
-    });
-
-    // Reverse the inventory (subtract the inbound quantity)
     const updatedInventory = await Inventory.updateStock(
       inset.skuId,
-      -inset.quantity,  // Negative to subtract
+      -inset.quantity,
       inset.bin
     );
 
-    console.log('✅ Inventory reversed successfully:', {
-      skuId: updatedInventory.skuId,
-      bin: updatedInventory.bin,
-      oldQuantity: inventoryItem.quantity,
-      newQuantity: updatedInventory.quantity
-    });
-
-    // Delete the inset record
     await Inset.findByIdAndDelete(id);
-    console.log('✅ Inset record deleted');
 
-    console.log('=== INSET DELETION SUCCESS ===');
     res.status(200).json({ 
       message: 'Inbound record deleted and inventory reversed successfully',
       deletedInset: {
@@ -429,9 +415,6 @@ const deleteInset = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('=== INSET DELETION ERROR ===');
-    console.error('Error details:', error);
-    
     res.status(500).json({ 
       message: 'Failed to delete inbound record', 
       error: error.message 
@@ -441,6 +424,7 @@ const deleteInset = async (req, res) => {
 
 module.exports = {
   createInset,
+  createBatchInset, // 🚀 NEW
   getAllInsets,
   getInsetById,
   updateInset,

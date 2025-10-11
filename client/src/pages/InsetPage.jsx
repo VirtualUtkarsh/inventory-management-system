@@ -1,51 +1,47 @@
-//Enhanced UI with batch import functionality and searchable bin selector
-import React, { useState, useEffect, useCallback } from 'react';
+// client/src/pages/InsetPage.jsx - OPTIMIZED VERSION
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import { useInboundCart } from '../hooks/useInboundCart'; // 🚀 NEW
+import InboundCart from '../components/InboundCart'; // 🚀 NEW
 import ExcelImport from '../components/ExcelImport';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
-import { Trash2 } from 'lucide-react'; // Add Trash2 to existing lucide-react import
 import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  Printer, 
-  RefreshCw,
-  ArrowDownToLine,
-  TrendingUp,
-  Calendar,
-  User,
-  MapPin,
-  X,
-  AlertTriangle,
-  Package,
-  Upload,
-  Layers
+  Plus, Search, Filter, Download, Printer, RefreshCw,
+  ArrowDownToLine, TrendingUp, Calendar, User, MapPin,
+  X, AlertTriangle, Package, Upload, Layers, Trash2, ShoppingCart
 } from 'lucide-react';
-import 'react-toastify/dist/ReactToastify.css';
 
 const InsetPage = () => {
   const { user, token } = useAuth();
   
+  // 🚀 Cart functionality
+  const {
+    cartItems,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    getCartSummary
+  } = useInboundCart();
+
   const [formData, setFormData] = useState({
     skuId: '',
     bin: '',
     quantity: ''
   });
+  
   const [deletingInset, setDeletingInset] = useState(false);
-  const [deleteModal, setDeleteModal] = useState({
-    isOpen: false,
-    item: null
-  });
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null });
   const [insets, setInsets] = useState([]);
-  const [filteredInsets, setFilteredInsets] = useState([]);
   const [bins, setBins] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [showCart, setShowCart] = useState(false); // 🚀 NEW
   const [showImportModal, setShowImportModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [processingCart, setProcessingCart] = useState(false); // 🚀 NEW
   const [error, setError] = useState(null);
   const [binsLoading, setBinsLoading] = useState(true);
   const [binSearchTerm, setBinSearchTerm] = useState('');
@@ -62,89 +58,8 @@ const InsetPage = () => {
     todayOnly: false
   });
 
-  const fetchBins = useCallback(async () => {
-    try {
-      const res = await axiosInstance.get('/api/metadata/bins', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setBins(res.data);
-    } catch (err) {
-      console.error('Error fetching bins:', err);
-      if (err.response?.status === 404) {
-        setError('No bins available. Please contact admin to add bins first.');
-      }
-    } finally {
-      setBinsLoading(false);
-    }
-  }, [token]);
-
-  const fetchInsets = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await axiosInstance.get('/api/insets', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setInsets(res.data);
-      setFilteredInsets(res.data);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch data');
-      console.error('Fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
-
-  const handleImportComplete = useCallback((results) => {
-    console.log('Import completed:', results);
-    
-    if (results.data && results.data.results) {
-      const { results: importResults } = results.data;
-      
-      if (importResults.successCount > 0) {
-        toast.success(
-          `Successfully imported ${importResults.successCount} inbound records. ` +
-          `Refreshing data...`
-        );
-        setTimeout(() => {
-          fetchInsets();
-          setShowImportModal(false);
-        }, 1000);
-      }
-      
-      if (importResults.errorCount > 0) {
-        toast.warning(`${importResults.errorCount} records had errors during import.`);
-      }
-      
-      if (importResults.warnings && importResults.warnings.length > 0) {
-        toast.info(`${importResults.warnings.length} records had warnings during import.`);
-      }
-    } else {
-      toast.success('Import completed successfully. Refreshing inbound records...');
-      setTimeout(() => {
-        fetchInsets();
-        setShowImportModal(false);
-      }, 1000);
-    }
-  }, [fetchInsets]);
-
-  useEffect(() => {
-    fetchBins();
-    fetchInsets();
-  }, [fetchBins, fetchInsets]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showBinDropdown && !event.target.closest('.bin-dropdown-container')) {
-        setShowBinDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showBinDropdown]);
-
-  useEffect(() => {
+  // 🚀 Memoized filtered insets (prevents unnecessary recalculation)
+  const filteredInsets = useMemo(() => {
     let filtered = [...insets];
 
     if (filters.search) {
@@ -176,25 +91,19 @@ const InsetPage = () => {
     if (filters.dateFrom) {
       const fromDate = new Date(filters.dateFrom);
       fromDate.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(item => 
-        new Date(item.createdAt) >= fromDate
-      );
+      filtered = filtered.filter(item => new Date(item.createdAt) >= fromDate);
     }
 
     if (filters.dateTo) {
       const toDate = new Date(filters.dateTo);
       toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(item => 
-        new Date(item.createdAt) <= toDate
-      );
+      filtered = filtered.filter(item => new Date(item.createdAt) <= toDate);
     }
 
     if (filters.recentOnly) {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      filtered = filtered.filter(item => 
-        new Date(item.createdAt) >= sevenDaysAgo
-      );
+      filtered = filtered.filter(item => new Date(item.createdAt) >= sevenDaysAgo);
     }
 
     if (filters.todayOnly) {
@@ -210,8 +119,70 @@ const InsetPage = () => {
       });
     }
 
-    setFilteredInsets(filtered);
+    return filtered;
   }, [filters, insets]);
+
+  const fetchBins = useCallback(async () => {
+    try {
+      const res = await axiosInstance.get('/api/metadata/bins', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBins(res.data);
+    } catch (err) {
+      console.error('Error fetching bins:', err);
+      if (err.response?.status === 404) {
+        setError('No bins available. Please contact admin to add bins first.');
+      }
+    } finally {
+      setBinsLoading(false);
+    }
+  }, [token]);
+
+  const fetchInsets = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axiosInstance.get('/api/insets', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setInsets(res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  const handleImportComplete = useCallback((results) => {
+    if (results.data?.successCount > 0) {
+      toast.success(
+        `Successfully imported ${results.data.successCount} inbound records.`
+      );
+      setTimeout(() => {
+        fetchInsets();
+        setShowImportModal(false);
+      }, 1000);
+    }
+    
+    if (results.data?.errorCount > 0) {
+      toast.warning(`${results.data.errorCount} records had errors.`);
+    }
+  }, [fetchInsets]);
+
+  useEffect(() => {
+    fetchBins();
+    fetchInsets();
+  }, [fetchBins, fetchInsets]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showBinDropdown && !event.target.closest('.bin-dropdown-container')) {
+        setShowBinDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showBinDropdown]);
 
   const handleFilterChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -281,7 +252,8 @@ const InsetPage = () => {
     return null;
   };
 
-  const handleSubmit = async (e) => {
+  // 🚀 NEW: Add to cart instead of immediate submit
+  const handleAddToCart = (e) => {
     e.preventDefault();
     
     const validationError = validateForm();
@@ -289,49 +261,68 @@ const InsetPage = () => {
       setError(validationError);
       return;
     }
-    
-    setLoading(true);
-    setError(null);
 
-    const submissionData = {
+    addToCart({
       skuId: formData.skuId.trim().toUpperCase(),
       bin: formData.bin,
-      quantity: Number(formData.quantity),
-      user: {
-        id: user.id,
-        name: user.name
-      }
-    };
+      quantity: Number(formData.quantity)
+    });
 
-    try {
-      await axiosInstance.post('/api/insets', submissionData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setFormData({
-        skuId: '',
-        bin: '',
-        quantity: ''
-      });
-      setBinSearchTerm('');
-      setShowForm(false);
-      await fetchInsets();
-      toast.success('Inbound item added successfully!');
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Submission failed';
-      setError(errorMessage);
-      console.error('Submit error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
+    // Reset form but keep it open
     setFormData({
       skuId: '',
       bin: '',
       quantity: ''
     });
+    setBinSearchTerm('');
+    setError(null);
+  };
+
+  // 🚀 NEW: Process cart (batch submission)
+  const handleProcessCart = async (cartData) => {
+    try {
+      setProcessingCart(true);
+
+      const response = await axiosInstance.post('/api/insets/batch', {
+        items: cartData.items,
+        notes: cartData.notes,
+        user: {
+          id: user.id,
+          name: user.name
+        }
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success(`Batch inbound completed! ${response.data.successfulItems} items processed.`);
+      
+      // 🚀 Optimistic update: Add new items to state without full refresh
+      const newInsets = cartData.items.map((item, index) => ({
+        _id: `temp-${Date.now()}-${index}`,
+        skuId: item.skuId,
+        bin: item.bin,
+        quantity: item.quantity,
+        user: { id: user.id, name: user.name },
+        createdAt: new Date().toISOString()
+      }));
+      
+      setInsets(prev => [...newInsets, ...prev]);
+      clearCart();
+      setShowCart(false);
+      
+      // Fetch in background to sync with server
+      setTimeout(fetchInsets, 1000);
+
+    } catch (error) {
+      console.error('Cart processing error:', error);
+      toast.error(error.response?.data?.message || 'Failed to process inbound batch');
+    } finally {
+      setProcessingCart(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({ skuId: '', bin: '', quantity: '' });
     setShowForm(false);
     setError(null);
     setBinSearchTerm('');
@@ -423,41 +414,36 @@ const InsetPage = () => {
     printWindow.print();
     printWindow.close();
   };
-const handleDeleteClick = (inset) => {
-  setDeleteModal({
-    isOpen: true,
-    item: inset
-  });
-};
 
-const handleDeleteConfirm = async () => {
-  try {
-    setDeletingInset(true);
-    
-    const response = await axiosInstance.delete(`/api/insets/${deleteModal.item._id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+  const handleDeleteClick = (inset) => {
+    setDeleteModal({ isOpen: true, item: inset });
+  };
 
-    console.log('✅ Inset deleted:', response.data);
-    
-    toast.success(
-      `Inbound deleted! ${response.data.inventoryUpdate.reversed} units removed from bin ${response.data.inventoryUpdate.bin}`
-    );
-    
-    // Close modal and refresh data
+  const handleDeleteConfirm = async () => {
+    try {
+      setDeletingInset(true);
+      
+      const response = await axiosInstance.delete(`/api/insets/${deleteModal.item._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success(
+        `Inbound deleted! ${response.data.inventoryUpdate.reversed} units removed from bin ${response.data.inventoryUpdate.bin}`
+      );
+      
+      setDeleteModal({ isOpen: false, item: null });
+      await fetchInsets();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete inbound record');
+    } finally {
+      setDeletingInset(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
     setDeleteModal({ isOpen: false, item: null });
-    await fetchInsets();
-  } catch (error) {
-    console.error('❌ Delete error:', error);
-    toast.error(error.response?.data?.message || 'Failed to delete inbound record');
-  } finally {
-    setDeletingInset(false);
-  }
-};
+  };
 
-const handleDeleteCancel = () => {
-  setDeleteModal({ isOpen: false, item: null });
-};
   const totalInbound = insets.length;
   const totalQuantityAdded = insets.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const todayCount = insets.filter(item => {
@@ -466,6 +452,7 @@ const handleDeleteCancel = () => {
     return itemDate.toDateString() === today.toDateString();
   }).length;
   const uniqueSkus = [...new Set(insets.map(item => item.skuId).filter(Boolean))].length;
+  const cartSummary = getCartSummary(); // 🚀 NEW
 
   if (binsLoading) {
     return (
@@ -490,13 +477,8 @@ const handleDeleteCancel = () => {
           <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-6" />
           <h2 className="text-2xl font-bold text-gray-900 mb-4">No Bins Available</h2>
           <p className="text-gray-600 mb-6 max-w-md mx-auto">
-            No bins have been configured yet. Please contact your administrator to add bins before creating inbound records.
+            No bins have been configured yet. Please contact your administrator to add bins.
           </p>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto">
-            <p className="text-yellow-800 text-sm">
-              <strong>Admin Note:</strong> Bins can be added from the Admin Dashboard → Bins Manager
-            </p>
-          </div>
         </div>
       </div>
     );
@@ -507,7 +489,7 @@ const handleDeleteCancel = () => {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Inbound Management</h1>
-          <p className="mt-2 text-gray-600">Track and manage incoming inventory items</p>
+          <p className="mt-2 text-gray-600">Add items to cart and process batch inbound</p>
         </div>
         
         <div className="mt-4 lg:mt-0 flex flex-wrap gap-3">
@@ -516,12 +498,26 @@ const handleDeleteCancel = () => {
             className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Inbound Item
+            Add to Cart
+          </button>
+
+          {/* 🚀 NEW: Cart Button */}
+          <button
+            onClick={() => setShowCart(true)}
+            className="relative inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Cart
+            {cartSummary.totalItems > 0 && (
+              <span className="absolute -top-2 -right-2 px-2 py-1 bg-red-500 text-white text-xs rounded-full min-w-[1.25rem] h-5 flex items-center justify-center">
+                {cartSummary.totalItems}
+              </span>
+            )}
           </button>
 
           <button
             onClick={() => setShowImportModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Upload className="w-4 h-4 mr-2" />
             Import Excel
@@ -533,7 +529,7 @@ const handleDeleteCancel = () => {
             className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Download className="w-4 h-4 mr-2" />
-            Export CSV
+            Export
           </button>
           
           <button
@@ -584,14 +580,15 @@ const handleDeleteCancel = () => {
           </div>
         </div>
 
+        {/* 🚀 NEW: Cart items stat */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center">
             <div className="p-2 bg-orange-100 rounded-lg">
-              <Layers className="w-6 h-6 text-orange-600" />
+              <ShoppingCart className="w-6 h-6 text-orange-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Unique SKUs</p>
-              <p className="text-2xl font-bold text-gray-900">{uniqueSkus}</p>
+              <p className="text-sm font-medium text-gray-600">Items in Cart</p>
+              <p className="text-2xl font-bold text-gray-900">{cartSummary.totalItems}</p>
             </div>
           </div>
         </div>
@@ -601,8 +598,8 @@ const handleDeleteCancel = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Add New Inbound Item</h2>
-              <p className="text-gray-600 mt-1">Enter the details for the incoming inventory item</p>
+              <h2 className="text-xl font-semibold text-gray-900">Add Items to Cart</h2>
+              <p className="text-gray-600 mt-1">Add multiple items before processing</p>
             </div>
             <button
               onClick={resetForm}
@@ -619,7 +616,7 @@ const handleDeleteCancel = () => {
             </div>
           )}
           
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleAddToCart} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -716,14 +713,8 @@ const handleDeleteCancel = () => {
                 disabled={loading || bins.length === 0}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors flex items-center"
               >
-                {loading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Add Inbound Item'
-                )}
+                <Plus className="w-4 h-4 mr-2" />
+                Add to Cart
               </button>
             </div>
           </form>
@@ -876,6 +867,22 @@ const handleDeleteCancel = () => {
           Showing {filteredInsets.length} of {totalInbound} inbound records
           {loading && <span className="ml-2 text-blue-600">(Updating...)</span>}
         </p>
+
+        {/* 🚀 NEW: Cart indicator */}
+        {cartSummary.totalItems > 0 && (
+          <div className="flex items-center space-x-4 text-sm text-purple-600 bg-purple-50 px-4 py-2 rounded-lg">
+            <ShoppingCart className="w-4 h-4" />
+            <span>
+              {cartSummary.totalItems} items in cart ({cartSummary.totalQuantity} units)
+            </span>
+            <button
+              onClick={() => setShowCart(true)}
+              className="text-purple-700 hover:text-purple-800 font-medium underline"
+            >
+              Review Cart
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -915,10 +922,10 @@ const handleDeleteCancel = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added By</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Added</th>
                     {user?.role === 'admin' && (
-  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-    Actions
-  </th>
-)}
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -962,19 +969,20 @@ const handleDeleteCancel = () => {
                           })}
                         </div>
                       </td>
+                      
                       {user?.role === 'admin' && (
-  <td className="px-6 py-4 whitespace-nowrap text-right">
-    <button
-      onClick={() => handleDeleteClick(inset)}
-      disabled={deletingInset}
-      className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-      title="Delete and reverse inventory"
-    >
-      <Trash2 className="w-4 h-4 mr-1" />
-      Delete
-    </button>
-  </td>
-)}
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <button
+                            onClick={() => handleDeleteClick(inset)}
+                            disabled={deletingInset}
+                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                            title="Delete and reverse inventory"
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -1003,6 +1011,7 @@ const handleDeleteCancel = () => {
         )}
       </div>
 
+      {/* Modals */}
       {showImportModal && (
         <ExcelImport
           importType="inbound"
@@ -1010,31 +1019,45 @@ const handleDeleteCancel = () => {
           onImportComplete={handleImportComplete}
         />
       )}
+
+      {/* 🚀 NEW: Inbound Cart Modal */}
+      {showCart && (
+        <InboundCart
+          cartItems={cartItems}
+          onUpdateQuantity={updateQuantity}
+          onRemoveItem={removeFromCart}
+          onClearCart={clearCart}
+          onProcessCart={handleProcessCart}
+          onClose={() => setShowCart(false)}
+          loading={processingCart}
+        />
+      )}
+
       {/* Delete Confirmation Modal */}
-<DeleteConfirmationModal
-  isOpen={deleteModal.isOpen}
-  onClose={handleDeleteCancel}
-  onConfirm={handleDeleteConfirm}
-  title="Delete Inbound Record"
-  message={
-    deleteModal.item ? (
-      <div className="space-y-2">
-        <p>Are you sure you want to delete this inbound record?</p>
-        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
-          <p className="font-semibold text-yellow-900 mb-2">This will:</p>
-          <ul className="list-disc list-inside space-y-1 text-yellow-800">
-            <li>Delete the inbound record for <strong>{deleteModal.item.skuId}</strong></li>
-            <li>Remove <strong>{deleteModal.item.quantity}</strong> units from bin <strong>{deleteModal.item.bin}</strong></li>
-            <li>Update inventory accordingly</li>
-          </ul>
-        </div>
-        <p className="text-red-600 font-medium mt-3">This action cannot be undone!</p>
-      </div>
-    ) : ''
-  }
-  confirmText="Delete & Reverse Inventory"
-  isLoading={deletingInset}
-/>
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Inbound Record"
+        message={
+          deleteModal.item ? (
+            <div className="space-y-2">
+              <p>Are you sure you want to delete this inbound record?</p>
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+                <p className="font-semibold text-yellow-900 mb-2">This will:</p>
+                <ul className="list-disc list-inside space-y-1 text-yellow-800">
+                  <li>Delete the inbound record for <strong>{deleteModal.item.skuId}</strong></li>
+                  <li>Remove <strong>{deleteModal.item.quantity}</strong> units from bin <strong>{deleteModal.item.bin}</strong></li>
+                  <li>Update inventory accordingly</li>
+                </ul>
+              </div>
+              <p className="text-red-600 font-medium mt-3">This action cannot be undone!</p>
+            </div>
+          ) : ''
+        }
+        confirmText="Delete & Reverse Inventory"
+        isLoading={deletingInset}
+      />
     </div>
   );
 };
