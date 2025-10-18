@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// client/src/components/ProductSelector.jsx
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import {
   Search,
   Package,
@@ -7,8 +8,27 @@ import {
   X,
   RefreshCw,
   Check,
-  ShoppingCart
+  ShoppingCart,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+
+// ✅ Debounced search hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+const ITEMS_PER_PAGE = 50; // Show 50 SKUs per page
 
 const ProductSelector = ({ 
   inventory, 
@@ -18,53 +38,79 @@ const ProductSelector = ({
   loading = false 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const debouncedSearch = useDebounce(searchTerm, 300);
 
-  const getDisplaySku = (item) => {
-    return item.skuId || item.sku || 'N/A';
-  };
+  // ✅ Memoize cart lookup map (O(1) access)
+  const cartMap = useMemo(() => {
+    const map = new Map();
+    cartItems.forEach(item => {
+      const key = `${item.skuId}-${item.bin}`;
+      map.set(key, item.quantity);
+    });
+    return map;
+  }, [cartItems]);
 
-  const getQuantityInCart = (product) => {
-    const cartKey = `${product.skuId}-${product.bin}`;
-    const cartItem = cartItems.find(item => `${item.skuId}-${item.bin}` === cartKey);
-    return cartItem ? cartItem.quantity : 0;
-  };
+  const getQuantityInCart = useCallback((product) => {
+    return cartMap.get(`${product.skuId}-${product.bin}`) || 0;
+  }, [cartMap]);
 
-  const getGroupedInventory = () => {
+  // ✅ Memoize grouped inventory
+  const groupedInventory = useMemo(() => {
     const grouped = {};
     inventory.forEach(item => {
-      const sku = getDisplaySku(item);
+      const sku = item.skuId || item.sku || 'N/A';
       if (!grouped[sku]) {
         grouped[sku] = [];
       }
       grouped[sku].push(item);
     });
     return grouped;
-  };
+  }, [inventory]);
 
-  const filteredInventory = () => {
-    const groupedInventory = getGroupedInventory();
-    const filteredKeys = Object.keys(groupedInventory).filter(sku => {
-      if (!searchTerm.trim()) return true;
-      const search = searchTerm.toLowerCase();
-      return sku.toLowerCase().includes(search) || 
-             groupedInventory[sku].some(item => 
-               item.bin.toLowerCase().includes(search) ||
-               (item.name && item.name.toLowerCase().includes(search))
-             );
+  // ✅ Memoize filtered results
+  const filteredInventory = useMemo(() => {
+    if (!debouncedSearch.trim()) return groupedInventory;
+
+    const search = debouncedSearch.toLowerCase();
+    const filtered = {};
+
+    Object.entries(groupedInventory).forEach(([sku, products]) => {
+      const skuMatch = sku.toLowerCase().includes(search);
+      const productsMatch = products.some(item => 
+        item.bin.toLowerCase().includes(search) ||
+        (item.name && item.name.toLowerCase().includes(search))
+      );
+
+      if (skuMatch || productsMatch) {
+        filtered[sku] = products;
+      }
     });
+
+    return filtered;
+  }, [groupedInventory, debouncedSearch]);
+
+  // ✅ Pagination logic
+  const { paginatedItems, totalPages } = useMemo(() => {
+    const entries = Object.entries(filteredInventory);
+    const total = Math.ceil(entries.length / ITEMS_PER_PAGE);
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const paginated = entries.slice(start, end);
     
-    return filteredKeys.reduce((acc, sku) => {
-      acc[sku] = groupedInventory[sku];
-      return acc;
-    }, {});
-  };
+    return {
+      paginatedItems: Object.fromEntries(paginated),
+      totalPages: total
+    };
+  }, [filteredInventory, currentPage]);
 
-  const handleAddToCart = (product, quantity = 1) => {
-    onAddToCart(product, quantity);
-  };
+  // Reset to page 1 when search changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
-  const groupedInventory = filteredInventory();
-  const hasResults = Object.keys(groupedInventory).length > 0;
+  const hasResults = Object.keys(filteredInventory).length > 0;
+  const totalItems = Object.keys(filteredInventory).length;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -75,7 +121,7 @@ const ProductSelector = ({
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Select Products</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Browse inventory and add items to your outbound cart
+                {totalItems} product{totalItems !== 1 ? 's' : ''} available
               </p>
             </div>
             <button
@@ -87,7 +133,7 @@ const ProductSelector = ({
           </div>
           
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 -mt-2" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Search by SKU, product name, or bin location..."
@@ -120,50 +166,57 @@ const ProductSelector = ({
             </div>
           ) : (
             <div className="space-y-6">
-              {Object.entries(groupedInventory).map(([sku, products]) => (
-                <div key={sku} className="border border-gray-200 rounded-lg overflow-hidden">
-                  {/* SKU Header */}
-                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Package className="w-5 h-5 text-gray-600 mr-3" />
-                        <div>
-                          <h3 className="font-semibold text-gray-900">SKU: {sku}</h3>
-                          <p className="text-sm text-gray-600">
-                            Available in {products.length} bin{products.length !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Total: {products.reduce((sum, p) => sum + p.quantity, 0)} units
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Product Bins */}
-                  <div className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {products.map(product => (
-                        <ProductBinCard
-                          key={product._id}
-                          product={product}
-                          quantityInCart={getQuantityInCart(product)}
-                          onAddToCart={handleAddToCart}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
+              {Object.entries(paginatedItems).map(([sku, products]) => (
+                <SkuGroup
+                  key={sku}
+                  sku={sku}
+                  products={products}
+                  getQuantityInCart={getQuantityInCart}
+                  onAddToCart={onAddToCart}
+                />
               ))}
             </div>
           )}
         </div>
 
+        {/* Pagination Footer */}
+        {hasResults && totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                
+                <span className="text-sm text-gray-700 px-4">
+                  Page {currentPage} of {totalPages}
+                </span>
+                
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="p-6 border-t border-gray-200 bg-gray-50">
           <div className="flex justify-between items-center">
             <p className="text-sm text-gray-600">
-              {hasResults ? `${Object.keys(groupedInventory).length} product(s) found` : ''}
+              {cartItems.length > 0 && `${cartItems.length} item(s) in cart`}
             </p>
             <button
               onClick={onClose}
@@ -178,7 +231,50 @@ const ProductSelector = ({
   );
 };
 
-const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
+// ✅ Memoized SKU Group
+const SkuGroup = memo(({ sku, products, getQuantityInCart, onAddToCart }) => {
+  const totalQuantity = useMemo(() => 
+    products.reduce((sum, p) => sum + p.quantity, 0),
+    [products]
+  );
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Package className="w-5 h-5 text-gray-600 mr-3" />
+            <div>
+              <h3 className="font-semibold text-gray-900">SKU: {sku}</h3>
+              <p className="text-sm text-gray-600">
+                Available in {products.length} bin{products.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+          <div className="text-sm text-gray-600">
+            Total: {totalQuantity} units
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {products.map(product => (
+            <ProductBinCard
+              key={product._id}
+              product={product}
+              quantityInCart={getQuantityInCart(product)}
+              onAddToCart={onAddToCart}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ✅ Memoized Product Card
+const ProductBinCard = memo(({ product, quantityInCart = 0, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
@@ -186,35 +282,30 @@ const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
   const remainingQuantity = product.quantity - quantityInCart;
   const isFullyInCart = remainingQuantity <= 0;
 
-  const handleAdd = async () => {
+  const handleAdd = useCallback(async () => {
     setIsAdding(true);
     try {
       await onAddToCart(product, quantity);
       setQuantity(1);
-      
       setJustAdded(true);
-      
-      setTimeout(() => {
-        setJustAdded(false);
-      }, 2000);
+      setTimeout(() => setJustAdded(false), 2000);
     } finally {
       setIsAdding(false);
     }
-  };
+  }, [onAddToCart, product, quantity]);
 
-  const handleQuantityChange = (e) => {
+  const handleQuantityChange = useCallback((e) => {
     const value = Math.max(1, Math.min(Number(e.target.value), remainingQuantity));
     setQuantity(value);
-  };
+  }, [remainingQuantity]);
 
   return (
     <div className={`border rounded-lg p-4 transition-all ${
       isFullyInCart 
         ? 'border-gray-200 bg-gray-50 opacity-75' 
-        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 group'
+        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
     }`}>
       <div className="space-y-3">
-        {/* Bin Info */}
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <MapPin className="w-4 h-4 text-gray-500 mr-2" />
@@ -235,21 +326,18 @@ const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
           </div>
         </div>
 
-        {/* Product Details */}
         {product.name && (
           <div className="text-sm text-gray-700">
             {product.name}
           </div>
         )}
 
-        {/* Additional Info */}
         <div className="text-xs text-gray-500 space-y-1">
           {product.size && <div>Size: {product.size}</div>}
           {product.color && <div>Color: {product.color}</div>}
           {product.category && <div>Category: {product.category}</div>}
         </div>
 
-        {/* Quantity Input and Add Button */}
         <div className="flex items-center space-x-2 pt-2">
           <div className="flex-1">
             <input
@@ -266,7 +354,7 @@ const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
           <button
             onClick={handleAdd}
             disabled={isAdding || isFullyInCart}
-            className={` -mt-4 flex-shrink-0 px-3 py-1 text-white text-sm font-medium rounded transition-all flex items-center ${
+            className={`flex-shrink-0 px-3 py-1 text-white text-sm font-medium rounded transition-all flex items-center -mt-4 ${
               isFullyInCart
                 ? 'bg-gray-400 cursor-not-allowed'
                 : justAdded 
@@ -288,7 +376,7 @@ const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
               </>
             ) : quantityInCart > 0 ? (
               <>
-                <Plus className="w-3 h-3 mr-1 " />
+                <Plus className="w-3 h-3 mr-1" />
                 Add More
               </>
             ) : (
@@ -302,6 +390,9 @@ const ProductBinCard = ({ product, quantityInCart = 0, onAddToCart }) => {
       </div>
     </div>
   );
-};
+});
 
-export default ProductSelector;
+SkuGroup.displayName = 'SkuGroup';
+ProductBinCard.displayName = 'ProductBinCard';
+
+export default memo(ProductSelector);

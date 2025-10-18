@@ -1,26 +1,29 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import axios from '../utils/axiosInstance';
+// import axios from '../utils/axiosInstance';
 import { toast } from 'react-toastify';
 import InventoryTable from '../components/InventoryTable';
 import ExcelImport from '../components/ExcelImport';
+import { useDataCache } from '../context/DataCacheContext';
 import { 
   Search, 
   Filter, 
   Download, 
-  Upload, 
+  // Upload, 
   Printer, 
   RefreshCw,
   Package,
   TrendingUp,
   AlertTriangle,
-  Archive,
-  X
+  Archive
 } from 'lucide-react';
 import 'react-toastify/dist/ReactToastify.css';
 
 const InventoryPage = () => {
+  // const { token } = useAuth();
+  // const [inventory, setInventory] = useState([]);
   const { token } = useAuth();
+const { getInventory, invalidateCache, getCachedData } = useDataCache();
   const [inventory, setInventory] = useState([]);
   const [filteredInventory, setFilteredInventory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,9 +32,9 @@ const InventoryPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   
   // Refs to handle race conditions and cleanup
-  const abortControllerRef = useRef(null);
+  // const abortControllerRef = useRef(null);
   const isMountedRef = useRef(true);
-  const requestIdRef = useRef(0);
+  // const requestIdRef = useRef(0);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -47,65 +50,56 @@ const InventoryPage = () => {
   });
 
   // Cleanup function for component unmount
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+useEffect(() => {
+  isMountedRef.current = true;
+  return () => {
+    isMountedRef.current = false;
+  };
+}, []);
 
   // Fetch inventory function
-  const fetchInventory = useCallback(async () => {
-    try {
-      // Cancel any ongoing request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+const fetchInventory = useCallback(async (forceRefresh = false) => {
+  try {
+    setLoading(true);
+    setError('');
 
-      // Create new abort controller for this request
-      abortControllerRef.current = new AbortController();
-      const currentRequestId = ++requestIdRef.current;
-
-      setLoading(true);
-      setError('');
-
-      const { data } = await axios.get('/api/inventory', {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: abortControllerRef.current.signal
-      });
-
-      // Check if component is still mounted and this is the latest request
-      if (!isMountedRef.current || currentRequestId !== requestIdRef.current) {
-        return;
-      }
-
-      setInventory(data);
-      setFilteredInventory(data);
-      
-    } catch (err) {
-      // Don't show error if request was aborted (race condition handling)
-      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-        return;
-      }
-
-      // Check if component is still mounted
-      if (!isMountedRef.current) {
-        return;
-      }
-
-      setError('Failed to fetch inventory');
-      toast.error('Error loading inventory');
-      console.error('Inventory fetch error:', err);
-    } finally {
-      // Only update loading state if component is still mounted
-      if (isMountedRef.current) {
+    // If force refresh, invalidate cache first
+    if (forceRefresh) {
+      invalidateCache('inventory');
+    } else {
+      // Try to get cached data instantly
+      const cachedData = getCachedData('inventory');
+      if (cachedData) {
+        setInventory(cachedData);
+        setFilteredInventory(cachedData);
         setLoading(false);
       }
     }
-  }, [token]);
+
+    // Fetch from cache/API
+    const data = await getInventory();
+
+    if (!isMountedRef.current) return;
+
+    setInventory(data);
+    setFilteredInventory(data);
+    
+  } catch (err) {
+    if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+      return;
+    }
+
+    if (!isMountedRef.current) return;
+
+    setError('Failed to fetch inventory');
+    toast.error('Error loading inventory');
+    console.error('Inventory fetch error:', err);
+  } finally {
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
+  }
+}, [getInventory, invalidateCache, getCachedData]);
 
   // Handle Excel import completion
   const handleImportComplete = useCallback((results) => {
@@ -123,8 +117,10 @@ const InventoryPage = () => {
         );
         
         // Refresh inventory data after successful import
+        // Invalidate cache and refresh inventory data
+        invalidateCache('inventory');
         setTimeout(() => {
-          fetchInventory();
+          fetchInventory(true);
         }, 1000);
       }
       
@@ -141,7 +137,7 @@ const InventoryPage = () => {
         fetchInventory();
       }, 1000);
     }
-  }, [fetchInventory]);
+  }, [fetchInventory, invalidateCache]);
 
   // Download CSV function
   const downloadCSV = () => {
@@ -326,11 +322,11 @@ const InventoryPage = () => {
   }, []);
 
   // Throttled refresh to prevent multiple rapid calls
-  const throttledRefresh = useCallback(() => {
-    if (!loading) {
-      fetchInventory();
-    }
-  }, [fetchInventory, loading]);
+const throttledRefresh = useCallback(() => {
+  if (!loading) {
+    fetchInventory(true); // Force refresh
+  }
+}, [fetchInventory, loading]);
 
   // Calculate metrics
   const totalItems = inventory.length;
@@ -570,40 +566,41 @@ const InventoryPage = () => {
         </p>
       </div>
 
-      {/* Table or Error States */}
-      {loading && inventory.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-          <RefreshCw className="w-8 h-8 text-gray-400 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Loading inventory...</p>
-        </div>
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-          <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Error Loading Inventory</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-              <button 
-                onClick={throttledRefresh}
-                className="mt-3 text-sm text-red-700 underline hover:text-red-800"
-              >
-                Try Again
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : inventory.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-          <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No inventory records found</h3>
-          <p className="text-gray-500">Add some inbound items or import from Excel to populate your inventory</p>
-        </div>
-      ) : (
-        <InventoryTable 
-          inventory={filteredInventory} 
-          onRefresh={throttledRefresh}
-        />
-      )}
+{/* Table or Error States */}
+{error ? (
+  <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+    <div className="flex items-center space-x-3">
+      <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
+      <div>
+        <h3 className="text-sm font-medium text-red-800">Error Loading Inventory</h3>
+        <p className="text-sm text-red-700 mt-1">{error}</p>
+        <button 
+          onClick={throttledRefresh}
+          className="mt-3 text-sm text-red-700 underline hover:text-red-800"
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+  </div>
+) : loading && inventory.length === 0 ? (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+    <RefreshCw className="w-8 h-8 text-gray-400 mx-auto mb-4 animate-spin" />
+    <p className="text-gray-600">Loading inventory...</p>
+  </div>
+) : inventory.length === 0 && !loading ? (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+    <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+    <h3 className="text-lg font-medium text-gray-900 mb-2">No inventory records found</h3>
+    <p className="text-gray-500">Add some inbound items or import from Excel to populate your inventory</p>
+  </div>
+) : (
+  <InventoryTable 
+    inventory={filteredInventory} 
+    onRefresh={throttledRefresh}
+    loading={loading}
+  />
+)}
 
       {/* Excel Import Modal */}
       {showImportModal && (

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+// client/src/components/OutboundCart.jsx
+import React, { useState, useMemo, memo, useCallback } from 'react';
 import {
   ShoppingCart,
   X,
@@ -25,10 +26,9 @@ const OutboundCart = ({
   const [invoiceNo, setInvoiceNo] = useState('');
   const [editingItemId, setEditingItemId] = useState(null);
 
-  // Sort cart items by bin location
+  // ✅ OPTIMIZATION 1: Memoize sorted items - only sort when cart changes
   const sortedCartItems = useMemo(() => {
     return [...cartItems].sort((a, b) => {
-      // Natural sort for bin locations (e.g., A1, A2, A10, B1, B2)
       return a.bin.localeCompare(b.bin, undefined, { 
         numeric: true, 
         sensitivity: 'base' 
@@ -36,18 +36,19 @@ const OutboundCart = ({
     });
   }, [cartItems]);
 
-  const cartSummary = {
+  // ✅ OPTIMIZATION 2: Memoize cart summary
+  const cartSummary = useMemo(() => ({
     totalItems: cartItems.length,
     totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
-    uniqueSkus: [...new Set(cartItems.map(item => item.skuId))].length
-  };
+    uniqueSkus: new Set(cartItems.map(item => item.skuId)).size
+  }), [cartItems]);
 
-  const handleQuantityEdit = (itemId, newQuantity) => {
+  const handleQuantityEdit = useCallback((itemId, newQuantity) => {
     onUpdateQuantity(itemId, newQuantity);
     setEditingItemId(null);
-  };
+  }, [onUpdateQuantity]);
 
-  const handleProcessCart = () => {
+  const handleProcessCart = useCallback(() => {
     if (!customerName.trim() || !invoiceNo.trim()) {
       return;
     }
@@ -61,7 +62,7 @@ const OutboundCart = ({
       customerName: customerName.trim(),
       invoiceNo: invoiceNo.trim()
     });
-  };
+  }, [sortedCartItems, customerName, invoiceNo, onProcessCart]);
 
   const canProcess = cartItems.length > 0 && customerName.trim() && invoiceNo.trim() && !loading;
 
@@ -243,7 +244,8 @@ const OutboundCart = ({
   );
 };
 
-const CartItem = ({ 
+// ✅ OPTIMIZATION 3: Memoize individual cart items
+const CartItem = memo(({ 
   item, 
   isEditing, 
   onEdit, 
@@ -254,22 +256,22 @@ const CartItem = ({
 }) => {
   const [editQuantity, setEditQuantity] = useState(item.quantity);
 
-  const handleConfirmEdit = () => {
+  const handleConfirmEdit = useCallback(() => {
     if (editQuantity !== item.quantity) {
       onUpdateQuantity(editQuantity);
     } else {
       onCancelEdit();
     }
-  };
+  }, [editQuantity, item.quantity, onUpdateQuantity, onCancelEdit]);
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter') {
       handleConfirmEdit();
     } else if (e.key === 'Escape') {
       setEditQuantity(item.quantity);
       onCancelEdit();
     }
-  };
+  }, [handleConfirmEdit, item.quantity, onCancelEdit]);
 
   return (
     <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
@@ -354,7 +356,7 @@ const CartItem = ({
       </div>
     </div>
   );
-};
+});
 
 const EmptyCart = () => (
   <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -366,4 +368,6 @@ const EmptyCart = () => (
   </div>
 );
 
-export default OutboundCart;
+CartItem.displayName = 'CartItem';
+
+export default memo(OutboundCart);
