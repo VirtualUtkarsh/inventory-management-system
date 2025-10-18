@@ -41,7 +41,7 @@ DO NOT COMMIT OR PUSH ONTO THIS BRANCH.
 ### 2. Create a new feature branch
 For anything finalised feature you have added create a new branch like this for pushing the code.
 ```bash
-git checkout -b feature/<your-feature-name>
+git checkout -b <your-branch-name>
 ```
 I'll review and test the code and pull request to the dev branch.
 
@@ -57,8 +57,8 @@ These commands will push you code to new branch: feature/<your-feature-name>
 ```bash
 git add .
 git commit -m "Complete: <feature-name> ✅"
-git checkout -b v3plusadmin    # Create and switch to new branch
-git push -u origin v3plusadmin #you can replace v3plusadmin with your desired branch name 
+git checkout -b <your-branch-name>    # Create and switch to new branch- if not already
+git push -u origin <your-branch-name> #you must replace <your-branch-name> with your branch name 
 ```
 ### 5. Then, go to GitHub and **create a Pull Request from your feature branch to `dev`**.
 Then your pull request code will be reviewed and then merged if approved by at least one of the team members
@@ -75,6 +75,7 @@ Then your pull request code will be reviewed and then merged if approved by at l
 ## 🧠 Need Help?
 Try GPT 
 ![image](https://github.com/user-attachments/assets/ab9d3919-69de-4177-af33-40f453d9e005)
+
 
 
 
