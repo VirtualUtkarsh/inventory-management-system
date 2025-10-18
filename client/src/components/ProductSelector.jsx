@@ -354,7 +354,7 @@ const ProductBinCard = memo(({ product, quantityInCart = 0, onAddToCart }) => {
           <button
             onClick={handleAdd}
             disabled={isAdding || isFullyInCart}
-            className={`flex-shrink-0 px-3 py-1 text-white text-sm font-medium rounded transition-all flex items-center ${
+            className={`flex-shrink-0 px-3 py-1 text-white text-sm font-medium rounded transition-all flex items-center -mt-4 ${
               isFullyInCart
                 ? 'bg-gray-400 cursor-not-allowed'
                 : justAdded 

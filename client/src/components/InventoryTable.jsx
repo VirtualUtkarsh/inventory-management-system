@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { ChevronUp, ChevronDown, Package, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ChevronUp, ChevronDown, Package, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
-export default function InventoryTable({ inventory, onRefresh }) {
+export default function InventoryTable({ inventory, onRefresh, loading }) {
   const [sortConfig, setSortConfig] = useState({
     key: 'skuId',
     direction: 'ascending'
   });
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(100);
 
   // Sort function
   const handleSort = (key) => {
@@ -14,10 +17,11 @@ export default function InventoryTable({ inventory, onRefresh }) {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
+    setCurrentPage(1); // Reset to first page on sort
   };
 
   // Apply sorting
-  const sortedInventory = React.useMemo(() => {
+  const sortedInventory = useMemo(() => {
     let sortableItems = [...inventory];
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
@@ -45,6 +49,52 @@ export default function InventoryTable({ inventory, onRefresh }) {
     }
     return sortableItems;
   }, [inventory, sortConfig]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedInventory.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentPageData = sortedInventory.slice(startIndex, endIndex);
+
+  // Pagination handlers
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const handleRowsPerPageChange = (e) => {
+    const newRowsPerPage = Number(e.target.value);
+    setRowsPerPage(newRowsPerPage);
+    setCurrentPage(1); // Reset to first page
+  };
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 7;
+    
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 3) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
 
   // Get stock status styling
   const getStockStatus = (quantity) => {
@@ -110,20 +160,42 @@ export default function InventoryTable({ inventory, onRefresh }) {
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Table Header */}
       <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-3 lg:space-y-0">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Current Inventory</h3>
             <p className="text-sm text-gray-600 mt-1">
               {sortedInventory.length} items • Total quantity: {sortedInventory.reduce((sum, item) => sum + (item.quantity || 0), 0)}
             </p>
           </div>
-          <button
-            onClick={onRefresh}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </button>
+          
+          <div className="flex items-center space-x-3">
+            {/* Rows per page selector */}
+            <div className="flex items-center space-x-2">
+              <label htmlFor="rowsPerPage" className="text-sm text-gray-700 whitespace-nowrap">
+                Rows per page:
+              </label>
+              <select
+                id="rowsPerPage"
+                value={rowsPerPage}
+                onChange={handleRowsPerPageChange}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white mt-3"
+              >
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+                <option value={500}>500</option>
+              </select>
+            </div>
+
+            <button
+              onClick={onRefresh}
+              disabled={loading}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -142,7 +214,7 @@ export default function InventoryTable({ inventory, onRefresh }) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {sortedInventory.map((item) => {
+            {currentPageData.map((item) => {
               const stockStatus = getStockStatus(item.quantity);
               
               return (
@@ -189,10 +261,95 @@ export default function InventoryTable({ inventory, onRefresh }) {
         </table>
       </div>
 
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            {/* Showing X-Y of Z */}
+            <div className="text-sm text-gray-700">
+              Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+              <span className="font-medium">{Math.min(endIndex, sortedInventory.length)}</span> of{' '}
+              <span className="font-medium">{sortedInventory.length}</span> items
+            </div>
+
+            {/* Pagination buttons */}
+            <div className="flex items-center space-x-2">
+              {/* First page */}
+              <button
+                onClick={() => goToPage(1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="First page"
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </button>
+
+              {/* Previous page */}
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Previous page"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* Page numbers */}
+              <div className="hidden sm:flex items-center space-x-1">
+                {getPageNumbers().map((page, index) => (
+                  page === '...' ? (
+                    <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-500">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-300 hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                ))}
+              </div>
+
+              {/* Mobile: Current page indicator */}
+              <div className="sm:hidden px-3 py-2 text-sm font-medium text-gray-700">
+                Page {currentPage} of {totalPages}
+              </div>
+
+              {/* Next page */}
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Next page"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              {/* Last page */}
+              <button
+                onClick={() => goToPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Last page"
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Table Footer with Summary */}
       <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
-          <div className="flex items-center space-x-6 text-sm text-gray-600">
+          <div className="flex items-center flex-wrap gap-4 text-sm text-gray-600">
             <span className="flex items-center">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
               In Stock: {sortedInventory.filter(item => item.quantity >= 10).length}

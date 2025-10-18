@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// import React, { useState, useEffect, useCallback } from 'react';
+// import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useDataCache } from '../context/DataCacheContext';
+import React, { useState, useCallback, useMemo,useEffect} from 'react';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../utils/axiosInstance';
 import { toast } from 'react-toastify';
@@ -16,16 +19,24 @@ import {
   ArrowUpFromLine,
   TrendingDown,
   Calendar,
-  ShoppingCart,
-  X
+  ShoppingCart
 } from 'lucide-react';
 import 'react-toastify/dist/ReactToastify.css';
-
+// const LoadingModal = () => (
+//   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+//     <div className="bg-white rounded-xl p-8 flex flex-col items-center">
+//       <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mb-4" />
+//       <p className="text-gray-700">Loading...</p>
+//     </div>
+//   </div>
+// );
 export default function OutsetPage() {
-  const { user, token } = useAuth();
-  const [inventory, setInventory] = useState([]);
-  const [outsetItems, setOutsetItems] = useState([]);
-  const [filteredOutsets, setFilteredOutsets] = useState([]);
+  
+const { user, token } = useAuth();
+const { getInventory, getOutsets, invalidateCache, getCachedData } = useDataCache();
+const [inventory, setInventory] = useState([]);
+const [outsetItems, setOutsetItems] = useState([]);
+  // const [filteredOutsets, setFilteredOutsets] = useState([]);
   const [loading, setLoading] = useState({ 
     inventory: true, 
     outsets: true, 
@@ -38,14 +49,14 @@ export default function OutsetPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Cart functionality
-  const {
-    cartItems,
-    addToCart,
-    removeFromCart,
-    updateQuantity,
-    clearCart,
-    getCartSummary
-  } = useOutboundCart();
+const {
+  cartItems,
+  addToCart,
+  removeFromCart,
+  updateQuantity,
+  clearCart,
+  cartSummary
+} = useOutboundCart();
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -63,142 +74,148 @@ export default function OutsetPage() {
     batchOnly: false
   });
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [inventoryRes, outsetsRes] = await Promise.all([
-        axiosInstance.get('/api/inventory', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axiosInstance.get('/api/outsets', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      ]);
-      
-      setInventory(inventoryRes.data.filter(item => item.quantity > 0));
-      setOutsetItems(outsetsRes.data);
-      setFilteredOutsets(outsetsRes.data);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to load data');
-    } finally {
-      setLoading(prev => ({ ...prev, inventory: false, outsets: false }));
-    }
-  }, [token]);
+// ✅ Memoize filtered outsets - only recalculate when filters/outsetItems change
+const filteredOutsets = useMemo(() => {
+  let filtered = [...outsetItems];
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // Search filter
+  if (filters.search) {
+    const searchTerm = filters.search.toLowerCase();
+    filtered = filtered.filter(item => 
+      (item.skuId || '').toLowerCase().includes(searchTerm) ||
+      (item.customerName || '').toLowerCase().includes(searchTerm) ||
+      (item.invoiceNo || '').toLowerCase().includes(searchTerm) ||
+      (item.bin || '').toLowerCase().includes(searchTerm)
+    );
+  }
 
-  // Apply filters
-  useEffect(() => {
-    let filtered = [...outsetItems];
+  // SKU ID filter
+  if (filters.skuId) {
+    filtered = filtered.filter(item => 
+      (item.skuId || '').toLowerCase().includes(filters.skuId.toLowerCase())
+    );
+  }
 
-    Object.entries(filters).forEach(([key, value]) => {
-      if (!value) return;
+  // Customer filter
+  if (filters.customer) {
+    filtered = filtered.filter(item => 
+      (item.customerName || '').toLowerCase().includes(filters.customer.toLowerCase())
+    );
+  }
 
-      switch (key) {
-        case 'search':
-          const searchTerm = value.toLowerCase();
-          filtered = filtered.filter(item => 
-            (item.skuId || '').toLowerCase().includes(searchTerm) ||
-            (item.customerName || '').toLowerCase().includes(searchTerm) ||
-            (item.invoiceNo || '').toLowerCase().includes(searchTerm) ||
-            (item.bin || '').toLowerCase().includes(searchTerm)
-          );
-          break;
-        
-        case 'skuId':
-          filtered = filtered.filter(item => 
-            (item.skuId || '').toLowerCase().includes(value.toLowerCase())
-          );
-          break;
-        
-        case 'customer':
-          filtered = filtered.filter(item => 
-            (item.customerName || '').toLowerCase().includes(value.toLowerCase())
-          );
-          break;
-        
-        case 'invoiceNo':
-          filtered = filtered.filter(item => 
-            (item.invoiceNo || '').toLowerCase().includes(value.toLowerCase())
-          );
-          break;
-        
-        case 'bin':
-  filtered = filtered.filter(item => 
-    (item.bin || '').replace(/\s+/g, '').toLowerCase().includes(
-      value.replace(/\s+/g, '').toLowerCase()
-    )
-  );
-  break;
+  // Invoice filter
+  if (filters.invoiceNo) {
+    filtered = filtered.filter(item => 
+      (item.invoiceNo || '').toLowerCase().includes(filters.invoiceNo.toLowerCase())
+    );
+  }
 
-        
-        case 'userName':
-          filtered = filtered.filter(item => 
-            (item.user?.name || '').toLowerCase().includes(value.toLowerCase())
-          );
-          break;
-        
-        case 'dateFrom':
-          const fromDate = new Date(value);
-          fromDate.setHours(0, 0, 0, 0);
-          filtered = filtered.filter(item => 
-            new Date(item.createdAt) >= fromDate
-          );
-          break;
-        
-        case 'dateTo':
-          const toDate = new Date(value);
-          toDate.setHours(23, 59, 59, 999);
-          filtered = filtered.filter(item => 
-            new Date(item.createdAt) <= toDate
-          );
-          break;
-        
-        case 'recentOnly':
-          if (value) {
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            filtered = filtered.filter(item => 
-              new Date(item.createdAt) >= sevenDaysAgo
-            );
-          }
-          break;
-        
-        case 'todayOnly':
-          if (value) {
-            const today = new Date();
-            const startOfDay = new Date(today);
-            startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(today);
-            endOfDay.setHours(23, 59, 59, 999);
-            
-            filtered = filtered.filter(item => {
-              const itemDate = new Date(item.createdAt);
-              return itemDate >= startOfDay && itemDate <= endOfDay;
-            });
-          }
-          break;
-        
-        case 'largeQuantity':
-          if (value) {
-            filtered = filtered.filter(item => item.quantity >= 10);
-          }
-          break;
-        
-        case 'batchOnly':
-          if (value) {
-            filtered = filtered.filter(item => item.batchId);
-          }
-          break;
-            default:
-        // do nothing (avoids ESLint warning)
-        break;
-      }
+  // Bin filter
+  if (filters.bin) {
+    filtered = filtered.filter(item => 
+      (item.bin || '').replace(/\s+/g, '').toLowerCase().includes(
+        filters.bin.replace(/\s+/g, '').toLowerCase()
+      )
+    );
+  }
+
+  // User name filter
+  if (filters.userName) {
+    filtered = filtered.filter(item => 
+      (item.user?.name || '').toLowerCase().includes(filters.userName.toLowerCase())
+    );
+  }
+
+  // Date from filter
+  if (filters.dateFrom) {
+    const fromDate = new Date(filters.dateFrom);
+    fromDate.setHours(0, 0, 0, 0);
+    filtered = filtered.filter(item => 
+      new Date(item.createdAt) >= fromDate
+    );
+  }
+
+  // Date to filter
+  if (filters.dateTo) {
+    const toDate = new Date(filters.dateTo);
+    toDate.setHours(23, 59, 59, 999);
+    filtered = filtered.filter(item => 
+      new Date(item.createdAt) <= toDate
+    );
+  }
+
+  // Recent only filter
+  if (filters.recentOnly) {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    filtered = filtered.filter(item => 
+      new Date(item.createdAt) >= sevenDaysAgo
+    );
+  }
+
+  // Today only filter
+  if (filters.todayOnly) {
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    filtered = filtered.filter(item => {
+      const itemDate = new Date(item.createdAt);
+      return itemDate >= startOfDay && itemDate <= endOfDay;
     });
+  }
 
-    setFilteredOutsets(filtered);
-  }, [filters, outsetItems]);
+  // Large quantity filter
+  if (filters.largeQuantity) {
+    filtered = filtered.filter(item => item.quantity >= 10);
+  }
+
+  // Batch only filter
+  if (filters.batchOnly) {
+    filtered = filtered.filter(item => item.batchId);
+  }
+
+  return filtered;
+}, [filters, outsetItems]);
+
+const fetchData = useCallback(async (forceRefresh = false) => {
+  try {
+    // Invalidate if force refresh
+    if (forceRefresh) {
+      invalidateCache(['inventory', 'outsets']);
+    } else {
+      // Load cached data instantly
+      const cachedInventory = getCachedData('inventory');
+      const cachedOutsets = getCachedData('outsets');
+      
+      if (cachedInventory && cachedOutsets) {
+        setInventory(cachedInventory.filter(item => item.quantity > 0));
+        setOutsetItems(cachedOutsets);
+        setLoading(prev => ({ ...prev, inventory: false, outsets: false }));
+      }
+    }
+
+    // Fetch from cache/API
+    const [inventoryData, outsetsData] = await Promise.all([
+      getInventory(),
+      getOutsets()
+    ]);
+    
+    setInventory(inventoryData.filter(item => item.quantity > 0));
+    setOutsetItems(outsetsData);
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Failed to load data');
+  } finally {
+    setLoading(prev => ({ ...prev, inventory: false, outsets: false }));
+  }
+}, [getInventory, getOutsets, invalidateCache, getCachedData]);
+
+useEffect(() => {
+  console.log('🚀 Component mounted, calling fetchData');
+  fetchData();
+}, [fetchData]);
 
   const handleFilterChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -291,9 +308,10 @@ export default function OutsetPage() {
       }
 
       // Clear cart and refresh data
-      clearCart();
-      setShowCart(false);
-      await fetchData();
+clearCart();
+setShowCart(false);
+invalidateCache(['inventory', 'outsets']);
+await fetchData(true);
 
     } catch (error) {
       console.error('🚨 Cart processing error:', error);
@@ -325,7 +343,10 @@ const handleDeleteOutset = async (outsetId) => {
     );
     
     // Refresh data
-    await fetchData();
+    // await fetchData();
+    // Invalidate cache and refresh data
+    invalidateCache(['inventory', 'outsets']);
+    await fetchData(true);
   } catch (error) {
     console.error('❌ Delete error:', error);
     toast.error(error.response?.data?.message || 'Failed to delete outbound record');
@@ -450,6 +471,8 @@ const handleDeleteOutset = async (outsetId) => {
   // };
 
   // Calculate metrics
+// ✅ Memoize metrics calculations
+const metrics = useMemo(() => {
   const totalOutbound = outsetItems.length;
   const totalQuantityShipped = outsetItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const todayCount = outsetItems.filter(item => {
@@ -458,7 +481,8 @@ const handleDeleteOutset = async (outsetId) => {
     return itemDate.toDateString() === today.toDateString();
   }).length;
 
-  const cartSummary = getCartSummary();
+  return { totalOutbound, totalQuantityShipped, todayCount };
+}, [outsetItems]);
 
   return (
     <div className="space-y-6">
@@ -522,7 +546,7 @@ const handleDeleteOutset = async (outsetId) => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Outbound</p>
-              <p className="text-2xl font-bold text-gray-900">{totalOutbound}</p>
+              <p className="text-2xl font-bold text-gray-900">{metrics.totalOutbound}</p>
             </div>
           </div>
         </div>
@@ -534,7 +558,7 @@ const handleDeleteOutset = async (outsetId) => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Qty Shipped</p>
-              <p className="text-2xl font-bold text-gray-900">{totalQuantityShipped}</p>
+              <p className="text-2xl font-bold text-gray-900">{metrics.totalQuantityShipped}</p>
             </div>
           </div>
         </div>
@@ -546,7 +570,7 @@ const handleDeleteOutset = async (outsetId) => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Today</p>
-              <p className="text-2xl font-bold text-gray-900">{todayCount}</p>
+              <p className="text-2xl font-bold text-gray-900">{metrics.todayCount}</p>
             </div>
           </div>
         </div>
@@ -598,7 +622,7 @@ const handleDeleteOutset = async (outsetId) => {
               </button>
               
               <button
-                onClick={fetchData}
+                onClick={() => fetchData(true)}
                 disabled={loading.outsets}
                 className="inline-flex items-center px-4 py-2 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
@@ -759,7 +783,7 @@ const handleDeleteOutset = async (outsetId) => {
       {/* Results Summary */}
       <div className="flex justify-between items-center">
         <p className="text-sm text-gray-600">
-          Showing {filteredOutsets.length} of {totalOutbound} outbound records
+          Showing {filteredOutsets.length} of {metrics.totalOutbound} outbound records
           {loading.outsets && <span className="ml-2 text-blue-600">(Updating...)</span>}
         </p>
         
@@ -786,8 +810,8 @@ const handleDeleteOutset = async (outsetId) => {
         loading={loading.outsets || deletingOutset}
         onDeleteSuccess={handleDeleteOutset}
       />
-      {/* Modals */}
-      {showProductSelector && (
+{/* Modals */}
+{showProductSelector && (
   <ProductSelector
     inventory={inventory}
     cartItems={cartItems}
@@ -797,17 +821,17 @@ const handleDeleteOutset = async (outsetId) => {
   />
 )}
 
-      {showCart && (
-        <OutboundCart
-          cartItems={cartItems}
-          onUpdateQuantity={updateQuantity}
-          onRemoveItem={removeFromCart}
-          onClearCart={clearCart}
-          onProcessCart={handleProcessCart}
-          onClose={() => setShowCart(false)}
-          loading={loading.processing}
-        />
-      )}
+{showCart && (
+  <OutboundCart
+    cartItems={cartItems}
+    onUpdateQuantity={updateQuantity}
+    onRemoveItem={removeFromCart}
+    onClearCart={clearCart}
+    onProcessCart={handleProcessCart}
+    onClose={() => setShowCart(false)}
+    loading={loading.processing}
+  />
+)}
     </div>
   );
 }

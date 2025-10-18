@@ -1,4 +1,5 @@
 // client/src/pages/InsetPage.jsx - OPTIMIZED VERSION
+import { useDataCache } from '../context/DataCacheContext';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import { useAuth } from '../context/AuthContext';
@@ -7,14 +8,14 @@ import { useInboundCart } from '../hooks/useInboundCart'; // 🚀 NEW
 import InboundCart from '../components/InboundCart'; // 🚀 NEW
 import ExcelImport from '../components/ExcelImport';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
-import { 
+import {
   Plus, Search, Filter, Download, Printer, RefreshCw,
   ArrowDownToLine, TrendingUp, Calendar, User, MapPin,
-  X, AlertTriangle, Package, Upload, Layers, Trash2, ShoppingCart
+  X, AlertTriangle, Package, Upload, Trash2, ShoppingCart
 } from 'lucide-react';
 
 const InsetPage = () => {
-  const { user, token } = useAuth();
+  // const { user, token } = useAuth();
   
   // 🚀 Cart functionality
   const {
@@ -34,8 +35,12 @@ const InsetPage = () => {
   
   const [deletingInset, setDeletingInset] = useState(false);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null });
-  const [insets, setInsets] = useState([]);
-  const [bins, setBins] = useState([]);
+  // const [insets, setInsets] = useState([]);
+  // const [bins, setBins] = useState([]);
+  const { user, token } = useAuth();
+const { getInsets, getBins, invalidateCache, getCachedData } = useDataCache();
+const [insets, setInsets] = useState([]);
+const [bins, setBins] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showCart, setShowCart] = useState(false); // 🚀 NEW
   const [showImportModal, setShowImportModal] = useState(false);
@@ -122,52 +127,66 @@ const InsetPage = () => {
     return filtered;
   }, [filters, insets]);
 
-  const fetchBins = useCallback(async () => {
-    try {
-      const res = await axiosInstance.get('/api/metadata/bins', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setBins(res.data);
-    } catch (err) {
-      console.error('Error fetching bins:', err);
-      if (err.response?.status === 404) {
-        setError('No bins available. Please contact admin to add bins first.');
-      }
-    } finally {
+const fetchBins = useCallback(async () => {
+  try {
+    // Try cached data first
+    const cachedData = getCachedData('bins');
+    if (cachedData) {
+      setBins(cachedData);
       setBinsLoading(false);
     }
-  }, [token]);
 
-  const fetchInsets = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await axiosInstance.get('/api/insets', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setInsets(res.data);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch data');
-    } finally {
-      setLoading(false);
+    const data = await getBins();
+    setBins(data);
+  } catch (err) {
+    console.error('Error fetching bins:', err);
+    if (err.response?.status === 404) {
+      setError('No bins available. Please contact admin to add bins first.');
     }
-  }, [token]);
+  } finally {
+    setBinsLoading(false);
+  }
+}, [getBins, getCachedData]);
+
+const fetchInsets = useCallback(async (forceRefresh = false) => {
+  setLoading(true);
+  setError(null);
+  try {
+    if (forceRefresh) {
+      invalidateCache('insets');
+    } else {
+      const cachedData = getCachedData('insets');
+      if (cachedData) {
+        setInsets(cachedData);
+        setLoading(false);
+      }
+    }
+
+    const data = await getInsets();
+    setInsets(data);
+  } catch (err) {
+    setError(err.response?.data?.message || 'Failed to fetch data');
+  } finally {
+    setLoading(false);
+  }
+}, [getInsets, invalidateCache, getCachedData]);
 
   const handleImportComplete = useCallback((results) => {
     if (results.data?.successCount > 0) {
       toast.success(
         `Successfully imported ${results.data.successCount} inbound records.`
       );
-      setTimeout(() => {
-        fetchInsets();
-        setShowImportModal(false);
-      }, 1000);
+invalidateCache(['insets', 'inventory']);
+setTimeout(() => {
+  fetchInsets(true);
+  setShowImportModal(false);
+}, 1000);
     }
     
     if (results.data?.errorCount > 0) {
       toast.warning(`${results.data.errorCount} records had errors.`);
     }
-  }, [fetchInsets]);
+  }, [fetchInsets, invalidateCache]);
 
   useEffect(() => {
     fetchBins();
@@ -307,8 +326,12 @@ const InsetPage = () => {
       }));
       
       setInsets(prev => [...newInsets, ...prev]);
-      clearCart();
-      setShowCart(false);
+clearCart();
+setShowCart(false);
+
+// Invalidate both caches and refresh
+invalidateCache(['insets', 'inventory']);
+setTimeout(() => fetchInsets(true), 1000);
       
       // Fetch in background to sync with server
       setTimeout(fetchInsets, 1000);
@@ -451,7 +474,7 @@ const InsetPage = () => {
     const itemDate = new Date(item.createdAt);
     return itemDate.toDateString() === today.toDateString();
   }).length;
-  const uniqueSkus = [...new Set(insets.map(item => item.skuId).filter(Boolean))].length;
+  // const uniqueSkus = [...new Set(insets.map(item => item.skuId).filter(Boolean))].length;
   const cartSummary = getCartSummary(); // 🚀 NEW
 
   if (binsLoading) {
@@ -752,7 +775,7 @@ const InsetPage = () => {
               </button>
               
               <button
-                onClick={fetchInsets}
+                  onClick={() => fetchInsets(true)}
                 disabled={loading}
                 className="inline-flex items-center px-4 py-2 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
