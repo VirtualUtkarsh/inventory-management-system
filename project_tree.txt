@@ -3,6 +3,7 @@ InventorymgmtV1
 ├── Collaboration.md
 ├── package.json
 ├── project_tree.txt
+├── README.md
 ├── RunProject_README.md
 ├── client
 │   ├── .env
@@ -12,24 +13,6 @@ InventorymgmtV1
 │   ├── package.json
 │   ├── README.md
 │   ├── tailwind.config.js
-│   ├── build
-│   │   ├── asset-manifest.json
-│   │   ├── favicon.ico
-│   │   ├── index.html
-│   │   ├── logo192.png
-│   │   ├── logo512.png
-│   │   ├── manifest.json
-│   │   ├── robots.txt
-│   │   └── static
-│   │       ├── css
-│   │       │   ├── main.db000074.css
-│   │       │   └── main.db000074.css.map
-│   │       └── js
-│   │           ├── 453.a3c1d153.chunk.js
-│   │           ├── 453.a3c1d153.chunk.js.map
-│   │           ├── main.1385efbd.js
-│   │           ├── main.1385efbd.js.LICENSE.txt
-│   │           └── main.1385efbd.js.map
 │   ├── config
 │   │   ├── env.js
 │   │   ├── getHttpsConfig.js
@@ -45,7 +28,10 @@ InventorymgmtV1
 │   │       └── persistentCache
 │   │           └── createEnvironmentHash.js
 │   ├── public
+│   │   ├── apple-touch-icon.png
+│   │   ├── favicon-96x96.png
 │   │   ├── favicon.ico
+│   │   ├── favicon.svg
 │   │   ├── index.html
 │   │   ├── logo192.png
 │   │   ├── logo512.png
@@ -65,8 +51,9 @@ InventorymgmtV1
 │       ├── reportWebVitals.js
 │       ├── setupTests.js
 │       ├── components
+│       │   ├── DeleteConfirmationModal.jsx
 │       │   ├── ExcelImport.jsx
-│       │   ├── InboundCart.jsx                    
+│       │   ├── InboundCart.jsx
 │       │   ├── InventoryTable.jsx
 │       │   ├── Layout.jsx
 │       │   ├── Navigation.jsx
@@ -76,14 +63,15 @@ InventorymgmtV1
 │       │   ├── ProductSelector.jsx
 │       │   └── TableFilter.jsx
 │       ├── context
-│       │   └── AuthContext.jsx
+│       │   ├── AuthContext.jsx
+│       │   └── DataCacheContext.jsx
 │       ├── hooks
-│       │   ├── useInboundCart.js                  
+│       │   ├── useInboundCart.js
 │       │   ├── useOutboundCart.js
 │       │   └── useTableFilter.js
 │       ├── pages
 │       │   ├── AdminDashboard.jsx
-│       │   ├── InsetPage.jsx                      
+│       │   ├── InsetPage.jsx
 │       │   ├── InventoryPage.jsx
 │       │   ├── LoginPage.jsx
 │       │   ├── OutsetPage.jsx
@@ -96,20 +84,20 @@ InventorymgmtV1
     ├── diagnose-database.js
     ├── package-lock.json
     ├── package.json
+    ├── reset-inventory-data.js
     ├── seedAdmin.js
     ├── server.js
     ├── config
     │   └── db.js
     ├── controllers
     │   ├── adminController.js
-    │   ├── insetController.js                     
+    │   ├── insetController.js
     │   ├── inventoryController.js
     │   ├── metadataController.js
     │   ├── outsetController.js
     │   └── userController.js
     ├── fixtries
     │   ├── checkAdmin.js
-    │   ├── drop-unique-index.js
     │   └── fixAdmin.js
     ├── middleware
     │   └── auth.js
@@ -129,12 +117,12 @@ InventorymgmtV1
     │   ├── admin.js
     │   ├── api.js
     │   ├── auth.js
-    │   ├── insets.js                              
+    │   ├── insets.js
     │   ├── inventory.js
     │   ├── metadata.js
     │   └── outset.js
     └── utils
-        ├── adminBootstrap.js
+        ├── adminbootstrap.js
         ├── cleanupService.js
         ├── excelImportService.js
         └── InboundExcelImportService.js
