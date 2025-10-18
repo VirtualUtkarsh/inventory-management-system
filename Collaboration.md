@@ -18,7 +18,7 @@ This document explains exactly how our team will collaborate using Git and GitHu
 ### 🛠️ One-Time Setup
 
 ```bash
-git clone https://github.com/TusharVaishnaw/InventorymgmtV1.git
+    git clone https://github.com/TusharVaishnaw/inventory-management-system.git
 cd inventory-management-system
 git fetch --all
 git checkout dev
@@ -75,6 +75,7 @@ Then your pull request code will be reviewed and then merged if approved by at l
 ## 🧠 Need Help?
 Try GPT 
 ![image](https://github.com/user-attachments/assets/ab9d3919-69de-4177-af33-40f453d9e005)
+
 
 
 
