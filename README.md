@@ -89,8 +89,8 @@ Follow these instructions to get a copy of the project up and running on your lo
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/TusharVaishnaw/inventory-management-system.git
-    cd inventory-management-system
+git clone https://github.com/VirtualUtkarsh/inventory-management-system.git  
+cd inventory-management-system
     ```
 
 #### Backend Setup
