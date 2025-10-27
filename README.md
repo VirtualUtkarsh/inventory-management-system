@@ -5,7 +5,7 @@ A full-stack web application designed to streamline inventory tracking, manage i
 
 You can test the live application here:
 
-**Link:** [https://inventory-management-system-jhci.onrender.com/](https://inventory-management-system-jhci.onrender.com/)
+**Link:** [inventorymgmt-v1.vercel.app]
 
 **Admin Credentials:**
 -   **Email:** `admin123@inventory.com`
