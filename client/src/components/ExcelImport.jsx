@@ -1,11 +1,11 @@
-// client/src/components/ExcelImport.jsx - Complete Fixed Version
+// client/src/components/ExcelImport.jsx - UPDATED VERSION
 import React, { useState, useRef } from 'react';
 import axios from '../utils/axiosInstance';
 
 const ExcelImport = ({
   onImportComplete,
   onClose,
-  importType = 'inventory',   // kept flexible: can be 'inventory' or 'inbound'
+  importType = 'inventory',
 }) => {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -14,7 +14,6 @@ const ExcelImport = ({
   const [showSummary, setShowSummary] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Decide endpoint depending on importType
   const getImportEndpoint = () => {
     if (importType === 'inbound') {
       return '/api/insets/import-excel';
@@ -23,16 +22,17 @@ const ExcelImport = ({
     }
   };
 
-  // Instructions depend on importType
   const getInstructions = () => {
     if (importType === 'inbound') {
       return {
         title: 'Import Inbound Records from Excel',
         requirements: [
           'SKU: Product SKU identifier (e.g., "BOYTRACK", "FHST01")',
-          'BIN : Single bin location (e.g., "ST-022-005-003")',
+          'BIN: Single bin location (e.g., "ST-022-005-003")',
           'QUANTITY: Quantity to add to inbound',
           'Headers can be in any order, but names should contain these keywords',
+          '⚠️ IMPORTANT: Bins must already exist in database - they will NOT be auto-created',
+          'Records with non-existent bins will be returned as failed entries',
           'Current user will be automatically assigned to each record',
           'Date/time will be automatically set to current time',
         ],
@@ -41,23 +41,20 @@ const ExcelImport = ({
       return {
         title: 'Import Inventory from Excel',
         requirements: [
-         'SKU: Product SKU identifier (e.g., "BOYTRACK", "FHST01")',
-          'BIN : Single bin location (e.g., "ST-022-005-003")',
-          'QUANTITY: Quantity to add to inbound',
+          'SKU: Product SKU identifier (e.g., "BOYTRACK", "FHST01")',
+          'BIN: Single bin location (e.g., "ST-022-005-003")',
+          'QUANTITY: Quantity to add to inventory',
           'Headers can be in any order, but names should contain these keywords',
-          // 'Quantity will be split equally across multiple bins',
           'New bins will be created automatically if they don\'t exist',
         ],
       };
     }
   };
 
-  // File selection + validation
   const handleFileSelect = (event) => {
     const selectedFile = event.target.files[0];
     if (!selectedFile) return;
 
-    // Validate extension
     const validTypes = ['.xlsx', '.xls'];
     const fileExt = selectedFile.name
       .toLowerCase()
@@ -68,7 +65,6 @@ const ExcelImport = ({
       return;
     }
 
-    // Validate size <= 10MB
     if (selectedFile.size > 10 * 1024 * 1024) {
       setError('File size must be less than 10MB');
       setFile(null);
@@ -81,99 +77,35 @@ const ExcelImport = ({
     setShowSummary(false);
   };
 
-  // Upload and process
-const handleUpload = async () => {
-  if (!file) {
-    setError('Please select a file first');
-    return;
-  }
+  const handleUpload = async () => {
+    if (!file) {
+      setError('Please select a file first');
+      return;
+    }
 
-  setIsUploading(true);
-  setError(null);
-  setResults(null);
-  setShowSummary(false);
+    setIsUploading(true);
+    setError(null);
+    setResults(null);
+    setShowSummary(false);
 
-  try {
-    const formData = new FormData();
-    formData.append('excelFile', file);
+    try {
+      const formData = new FormData();
+      formData.append('excelFile', file);
 
-    console.log('📤 Uploading file:', file.name, 'as', importType);
+      console.log('📤 Uploading file:', file.name, 'as', importType);
 
-    const response = await axios.post(getImportEndpoint(), formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 300000, // 5 mins
-    });
+      const response = await axios.post(getImportEndpoint(), formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 300000,
+      });
 
-    console.log('✅ Import completed - Full response:', response.data);
-    
-    // Handle different response structures from different endpoints
-    let flatResults;
-    
-    // Check if it's the nested structure (inventory endpoint)
-    if (response.data?.data?.results) {
-      const apiResults = response.data.data.results;
-      const summary = apiResults.summary || {};
+      console.log('✅ Import completed - Full response:', response.data);
       
-      flatResults = {
-        totalRows: summary.totalRows || 0,
-        successCount: summary.successCount || 0,
-        errorCount: summary.errorCount || 0,
-        warningCount: summary.warningCount || 0,
-        stats: {
-          successRate: summary.successRate || '0%'
-        },
-        createdBins: apiResults.createdBins || [],
-        summary: apiResults.itemsProcessed || [],
-        errors: apiResults.errors || [],
-        warnings: apiResults.warnings || []
-      };
-    }
-    // Check if it's already flat (inbound endpoint - old structure)
-    else if (response.data?.totalRows !== undefined) {
-      flatResults = {
-        totalRows: response.data.totalRows || 0,
-        successCount: response.data.successCount || 0,
-        errorCount: response.data.errorCount || 0,
-        warningCount: response.data.warningCount || 0,
-        stats: {
-          successRate: response.data.stats?.successRate || '0%'
-        },
-        createdBins: response.data.createdBins || [],
-        summary: response.data.summary || [],
-        errors: response.data.errors || [],
-        warnings: response.data.warnings || []
-      };
-    }
-    // Fallback - try to extract whatever we can
-    else {
-      console.warn('Unknown response structure:', response.data);
-      flatResults = {
-        totalRows: 0,
-        successCount: 0,
-        errorCount: 0,
-        warningCount: 0,
-        stats: { successRate: '0%' },
-        createdBins: [],
-        summary: [],
-        errors: [],
-        warnings: []
-      };
-    }
-    
-    console.log('📊 Processed results:', flatResults);
-    setResults(flatResults);
-    setShowSummary(true);
-
-  } catch (err) {
-    console.error('❌ Upload failed:', err);
-    if (err.response?.data) {
-      setError(err.response.data.message || 'Import failed');
-      
-      // Try to extract results from error response too
+      // Handle different response structures
       let flatResults;
       
-      if (err.response.data?.data?.results) {
-        const apiResults = err.response.data.data.results;
+      if (response.data?.data?.results) {
+        const apiResults = response.data.data.results;
         const summary = apiResults.summary || {};
         
         flatResults = {
@@ -181,29 +113,93 @@ const handleUpload = async () => {
           successCount: summary.successCount || 0,
           errorCount: summary.errorCount || 0,
           warningCount: summary.warningCount || 0,
-          stats: { successRate: summary.successRate || '0%' },
+          stats: {
+            successRate: summary.successRate || '0%'
+          },
           createdBins: apiResults.createdBins || [],
           summary: apiResults.itemsProcessed || [],
           errors: apiResults.errors || [],
-          warnings: apiResults.warnings || []
+          warnings: apiResults.warnings || [],
+          failedEntries: apiResults.failedEntries || [] // 🚀 NEW
         };
-      } else if (err.response.data?.totalRows !== undefined) {
-        flatResults = err.response.data;
+      } else if (response.data?.totalRows !== undefined) {
+        flatResults = {
+          totalRows: response.data.totalRows || 0,
+          successCount: response.data.successCount || 0,
+          errorCount: response.data.errorCount || 0,
+          warningCount: response.data.warningCount || 0,
+          stats: {
+            successRate: response.data.stats?.successRate || '0%'
+          },
+          createdBins: response.data.createdBins || [],
+          summary: response.data.summary || [],
+          errors: response.data.errors || [],
+          warnings: response.data.warnings || [],
+          failedEntries: response.data.failedEntries || [] // 🚀 NEW
+        };
+      } else {
+        console.warn('Unknown response structure:', response.data);
+        flatResults = {
+          totalRows: 0,
+          successCount: 0,
+          errorCount: 0,
+          warningCount: 0,
+          stats: { successRate: '0%' },
+          createdBins: [],
+          summary: [],
+          errors: [],
+          warnings: [],
+          failedEntries: []
+        };
       }
       
-      if (flatResults && flatResults.totalRows > 0) {
-        setResults(flatResults);
-        setShowSummary(true);
+      console.log('📊 Processed results:', flatResults);
+      setResults(flatResults);
+      setShowSummary(true);
+
+    } catch (err) {
+      console.error('❌ Upload failed:', err);
+      if (err.response?.data) {
+        setError(err.response.data.message || 'Import failed');
+        
+        let flatResults;
+        
+        if (err.response.data?.data?.results) {
+          const apiResults = err.response.data.data.results;
+          const summary = apiResults.summary || {};
+          
+          flatResults = {
+            totalRows: summary.totalRows || 0,
+            successCount: summary.successCount || 0,
+            errorCount: summary.errorCount || 0,
+            warningCount: summary.warningCount || 0,
+            stats: { successRate: summary.successRate || '0%' },
+            createdBins: apiResults.createdBins || [],
+            summary: apiResults.itemsProcessed || [],
+            errors: apiResults.errors || [],
+            warnings: apiResults.warnings || [],
+            failedEntries: apiResults.failedEntries || []
+          };
+        } else if (err.response.data?.totalRows !== undefined) {
+          flatResults = {
+            ...err.response.data,
+            failedEntries: err.response.data.failedEntries || []
+          };
+        }
+        
+        if (flatResults && flatResults.totalRows > 0) {
+          setResults(flatResults);
+          setShowSummary(true);
+        }
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Upload timeout. File may be too large or connection is slow.');
+      } else {
+        setError('Network error. Please check your connection and try again.');
       }
-    } else if (err.code === 'ECONNABORTED') {
-      setError('Upload timeout. File may be too large or connection is slow.');
-    } else {
-      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsUploading(false);
     }
-  } finally {
-    setIsUploading(false);
-  }
-};
+  };
 
   const handleComplete = () => {
     if (onImportComplete && results) {
@@ -230,12 +226,39 @@ const handleUpload = async () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
+  // 🚀 NEW: Download failed entries as CSV
+  const downloadFailedEntries = () => {
+    if (!results?.failedEntries || results.failedEntries.length === 0) return;
+
+    const headers = ['Row', 'SKU', 'Bin', 'Quantity', 'Failure Reason'];
+    const csvData = results.failedEntries.map(entry => [
+      entry.row || 'N/A',
+      entry.sku || 'N/A',
+      entry.bin || 'N/A',
+      entry.quantity || 0,
+      entry.reason || entry.error || 'Unknown error'
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `failed_entries_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const instructions = getInstructions();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto">
-        {/* Header */}
         <div className="flex justify-between items-center p-6 border-b">
           <h2 className="text-xl font-semibold text-gray-800">{instructions.title}</h2>
           <button
@@ -250,22 +273,20 @@ const handleUpload = async () => {
         <div className="p-6">
           {!showSummary && (
             <>
-              {/* Instructions box */}
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
                 <h3 className="font-medium text-blue-900 mb-2">📋 Excel Format Requirements:</h3>
                 <ul className="text-sm text-blue-800 space-y-1 ml-4 list-disc">
                   {instructions.requirements.map((req, idx) => {
-                    const [key, desc] = req.split(':');
+                    const isWarning = req.includes('⚠️');
                     return (
-                      <li key={idx}>
-                        <strong>{key.trim()}:</strong> {desc ? desc.trim() : ''}
+                      <li key={idx} className={isWarning ? 'font-semibold text-red-700' : ''}>
+                        {req}
                       </li>
                     );
                   })}
                 </ul>
               </div>
 
-              {/* File input + clear */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Excel File (.xlsx or .xls)
@@ -303,7 +324,6 @@ const handleUpload = async () => {
                 )}
               </div>
 
-              {/* Error message */}
               {error && (
                 <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
                   <div className="flex">
@@ -312,7 +332,6 @@ const handleUpload = async () => {
                 </div>
               )}
 
-              {/* Upload button */}
               <div className="mb-6">
                 <button
                   onClick={handleUpload}
@@ -338,7 +357,6 @@ const handleUpload = async () => {
 
           {results && showSummary && (
             <div className="space-y-4">
-              {/* Summary */}
               <div className="bg-green-50 border border-green-200 rounded-md p-4">
                 <h3 className="font-medium text-green-900 mb-2">📊 Import Summary</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -369,7 +387,47 @@ const handleUpload = async () => {
                 </div>
               </div>
 
-              {/* Created Bins (if inventory) */}
+              {/* 🚀 NEW: Failed Entries Section */}
+              {results.failedEntries?.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium text-red-900">
+                      ❌ Failed Entries ({results.failedEntries.length})
+                    </h3>
+                    <button
+                      onClick={downloadFailedEntries}
+                      className="text-sm px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors"
+                    >
+                      Download CSV
+                    </button>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-red-100 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1 text-left">Row</th>
+                          <th className="px-2 py-1 text-left">SKU</th>
+                          <th className="px-2 py-1 text-left">Bin</th>
+                          <th className="px-2 py-1 text-left">Qty</th>
+                          <th className="px-2 py-1 text-left">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.failedEntries.map((entry, idx) => (
+                          <tr key={idx} className="border-t border-red-200">
+                            <td className="px-2 py-1 font-medium">{entry.row}</td>
+                            <td className="px-2 py-1">{entry.sku}</td>
+                            <td className="px-2 py-1">{entry.bin}</td>
+                            <td className="px-2 py-1">{entry.quantity}</td>
+                            <td className="px-2 py-1 text-red-800">{entry.reason || entry.error}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {importType === 'inventory' && results.createdBins?.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                   <h3 className="font-medium text-blue-900 mb-2">
@@ -381,7 +439,6 @@ const handleUpload = async () => {
                 </div>
               )}
 
-              {/* Errors */}
               {results.errors?.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-4">
                   <h3 className="font-medium text-red-900 mb-2">
@@ -402,7 +459,6 @@ const handleUpload = async () => {
                 </div>
               )}
 
-              {/* Warnings */}
               {results.warnings?.length > 0 && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
                   <h3 className="font-medium text-yellow-900 mb-2">
@@ -423,7 +479,6 @@ const handleUpload = async () => {
                 </div>
               )}
 
-              {/* Processed Items Preview */}
               {results.summary?.length > 0 && (
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
                   <h3 className="font-medium text-gray-900 mb-2">
@@ -478,7 +533,6 @@ const handleUpload = async () => {
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex justify-end space-x-4 p-6 border-t bg-gray-50">
           {!showSummary ? (
             <button

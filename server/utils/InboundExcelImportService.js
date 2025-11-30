@@ -16,7 +16,7 @@ class InboundExcelImportService {
       errorCount: 0,
       warnings: [],
       errors: [],
-      createdBins: [],
+      failedEntries: [], // NEW: Track failed entries with full data
       summary: []
     };
   }
@@ -51,11 +51,15 @@ class InboundExcelImportService {
       this.results.totalRows = dataRows.length;
       console.log(`📊 Processing ${this.results.totalRows} inbound rows from Excel file`);
 
-      // Process in batches of 50 for better performance (smaller batches for inbound)
+      // Pre-fetch all valid bins for validation
+      const validBins = await this.fetchValidBins();
+      console.log(`✅ Found ${validBins.size} valid bins in database`);
+
+      // Process in batches of 50 for better performance
       const BATCH_SIZE = 50;
       for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
         const batch = dataRows.slice(i, i + BATCH_SIZE);
-        await this.processBatch(batch, headers, i + 2); // +2 for Excel row numbers (1-indexed + header)
+        await this.processBatch(batch, headers, i + 2, validBins); // +2 for Excel row numbers
       }
 
       // Generate summary
@@ -71,6 +75,19 @@ class InboundExcelImportService {
         type: 'CRITICAL'
       });
       return this.results;
+    }
+  }
+
+  /**
+   * Fetch all valid bins from database
+   */
+  async fetchValidBins() {
+    try {
+      const bins = await Bin.find({ isActive: true }).select('name');
+      return new Set(bins.map(bin => bin.name.toUpperCase()));
+    } catch (error) {
+      console.error('❌ Failed to fetch bins:', error);
+      throw new Error('Failed to fetch valid bins from database');
     }
   }
 
@@ -117,10 +134,10 @@ class InboundExcelImportService {
   /**
    * Process a batch of rows
    */
-  async processBatch(batch, headers, startRowNum) {
+  async processBatch(batch, headers, startRowNum, validBins) {
     const promises = batch.map(async (row, batchIndex) => {
       const rowNum = startRowNum + batchIndex;
-      return this.processRow(row, headers, rowNum);
+      return this.processRow(row, headers, rowNum, validBins);
     });
 
     await Promise.allSettled(promises);
@@ -129,7 +146,7 @@ class InboundExcelImportService {
   /**
    * Process a single row for inbound records
    */
-  async processRow(row, headers, rowNum) {
+  async processRow(row, headers, rowNum, validBins) {
     try {
       // Extract data from row
       const sku = this.cleanValue(row[headers.sku]);
@@ -153,16 +170,17 @@ class InboundExcelImportService {
         throw new Error(`Invalid quantity: ${quantityStr}`);
       }
 
-      // For inbound, we expect single bin (unlike inventory which can have multiple)
+      // For inbound, we expect single bin
       const bin = binString.trim().toUpperCase();
+
+      // 🚀 CRITICAL: Check if bin exists in database - DO NOT CREATE
+      if (!validBins.has(bin)) {
+        throw new Error(`Bin "${bin}" does not exist in database. Please create the bin first.`);
+      }
 
       console.log(`🔄 Row ${rowNum}: Processing inbound SKU "${sku}" to bin "${bin}" with quantity ${quantity}`);
 
-      // Ensure bin exists (auto-create if needed)
-      await this.ensureBinExists(bin);
-
-    // Prepare inbound record data
- // Prepare inbound record data
+      // Prepare inbound record data
       const insetData = {
         skuId: sku.trim().toUpperCase(),
         bin: bin,
@@ -174,7 +192,6 @@ class InboundExcelImportService {
       };
 
       // Create a NEW inbound record for each Excel row
-      // This ensures each batch import creates a separate transaction record
       const inset = new Inset(insetData);
       const savedInset = await inset.save();
       
@@ -224,41 +241,25 @@ class InboundExcelImportService {
     } catch (error) {
       console.error(`❌ Inbound row ${rowNum} failed:`, error.message);
       this.results.errorCount++;
+      
+      // Add to errors array
       this.results.errors.push({
         row: rowNum,
         data: row,
         message: error.message,
         type: 'ROW_ERROR'
       });
-      this.results.processedRows++;
-    }
-  }
 
-  /**
-   * Ensure bin exists, create if needed
-   */
-  async ensureBinExists(binName) {
-    try {
-      const existingBin = await Bin.findOne({ name: binName, isActive: true });
-      
-      if (!existingBin) {
-        const newBin = new Bin({
-          name: binName,
-          isActive: true
-        });
-        
-        await newBin.save();
-        
-        if (!this.results.createdBins.includes(binName)) {
-          this.results.createdBins.push(binName);
-          console.log(`✨ Auto-created bin for inbound: ${binName}`);
-        }
-      }
-      
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed to create bin ${binName}:`, error);
-      throw new Error(`Failed to create bin ${binName}: ${error.message}`);
+      // 🚀 NEW: Add to failedEntries with full data for user reference
+      this.results.failedEntries.push({
+        row: rowNum,
+        sku: this.cleanValue(row[headers.sku]),
+        bin: this.cleanValue(row[headers.bin]),
+        quantity: this.cleanValue(row[headers.quantity]),
+        reason: error.message
+      });
+
+      this.results.processedRows++;
     }
   }
 
@@ -297,26 +298,26 @@ class InboundExcelImportService {
   }
 
   generateSummary() {
-  const successRate = this.results.totalRows > 0 ? 
-    (this.results.successCount / this.results.totalRows * 100).toFixed(1) : 0;
+    const successRate = this.results.totalRows > 0 ? 
+      (this.results.successCount / this.results.totalRows * 100).toFixed(1) : 0;
 
-  this.results.stats = {
-    successRate: `${successRate}%`,
-    createdBinsCount: this.results.createdBins.length,
-    warningCount: this.results.warnings.length
-  };
+    this.results.stats = {
+      successRate: `${successRate}%`,
+      warningCount: this.results.warnings.length,
+      failedEntriesCount: this.results.failedEntries.length
+    };
 
-  console.log(`
+    console.log(`
 📊 INBOUND IMPORT SUMMARY:
    Total Rows: ${this.results.totalRows}
    Processed: ${this.results.processedRows}
    Successful: ${this.results.successCount}
    Errors: ${this.results.errorCount}
    Warnings: ${this.results.warnings.length}
+   Failed Entries: ${this.results.failedEntries.length}
    Success Rate: ${successRate}%
-   Bins Created: ${this.results.createdBins.length}
-  `);
-}
+    `);
+  }
 }
 
 module.exports = InboundExcelImportService;

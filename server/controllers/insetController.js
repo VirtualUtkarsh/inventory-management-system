@@ -1,10 +1,11 @@
-// server/controllers/insetController.js - OPTIMIZED VERSION
+// server/controllers/insetController.js - UPDATED VERSION
 const Inset = require('../models/Inset');
 const Inventory = require('../models/Inventory');
+const Bin = require('../models/bin');
 const InboundExcelImportService = require('../utils/InboundExcelImportService');
 const mongoose = require('mongoose');
 
-// 🚀 NEW: Batch inbound creation (like batch outbound)
+// 🚀 Batch inbound creation with bin validation
 const createBatchInset = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -22,37 +23,71 @@ const createBatchInset = async (req, res) => {
     const batchId = new mongoose.Types.ObjectId();
     const batchUser = user || { id: req.userId, name: req.username };
 
+    // 🚀 Pre-fetch all valid bins
+    const validBins = await Bin.find({ isActive: true }).select('name').lean();
+    const validBinNames = new Set(validBins.map(bin => bin.name.toUpperCase()));
+
     // Validate all items first
     const errors = [];
     const validatedItems = [];
+    const failedItems = [];
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const { skuId, bin, quantity } = item;
 
+      // Basic validation
       if (!skuId || !bin || !quantity || quantity <= 0) {
-        errors.push({ item: i + 1, error: 'Invalid item data' });
+        const error = {
+          item: i + 1,
+          sku: skuId || 'N/A',
+          bin: bin || 'N/A',
+          quantity: quantity || 0,
+          error: 'Invalid item data - missing required fields'
+        };
+        errors.push(error);
+        failedItems.push(error);
+        continue;
+      }
+
+      const normalizedBin = bin.trim().toUpperCase();
+
+      // 🚀 CRITICAL: Check if bin exists - DO NOT CREATE
+      if (!validBinNames.has(normalizedBin)) {
+        const error = {
+          item: i + 1,
+          sku: skuId.trim().toUpperCase(),
+          bin: normalizedBin,
+          quantity: Number(quantity),
+          error: `Bin "${normalizedBin}" does not exist in database`
+        };
+        errors.push(error);
+        failedItems.push(error);
         continue;
       }
 
       validatedItems.push({
         skuId: skuId.trim().toUpperCase(),
-        bin: bin.trim().toUpperCase(),
+        bin: normalizedBin,
         quantity: Number(quantity),
         index: i
       });
     }
 
-    if (errors.length > 0) {
+    // If all items failed validation, abort
+    if (validatedItems.length === 0) {
       await session.abortTransaction();
       return res.status(400).json({
-        message: 'Validation failed',
+        message: 'All items failed validation',
         errors,
-        failedItems: errors.length
+        failedItems,
+        totalItems: items.length,
+        failedCount: failedItems.length,
+        successCount: 0
       });
     }
 
-    // 🚀 Bulk inventory updates
+    // 🚀 Bulk inventory updates for valid items only
     const bulkInventoryOps = validatedItems.map(item => ({
       updateOne: {
         filter: { skuId: item.skuId, bin: item.bin },
@@ -68,7 +103,7 @@ const createBatchInset = async (req, res) => {
       await Inventory.bulkWrite(bulkInventoryOps, { session });
     }
 
-    // 🚀 Bulk insert inset records
+    // 🚀 Bulk insert inset records for valid items only
     const insetRecords = validatedItems.map(item => ({
       skuId: item.skuId,
       bin: item.bin,
@@ -83,18 +118,32 @@ const createBatchInset = async (req, res) => {
 
     const totalTime = Date.now() - startTime;
 
-    res.status(201).json({
-      message: 'Batch inbound completed successfully',
+    // Return response with both success and failure info
+    const response = {
+      message: failedItems.length > 0 
+        ? `Batch partially completed: ${savedInsets.length} succeeded, ${failedItems.length} failed`
+        : 'Batch inbound completed successfully',
       batchId: batchId,
       totalItems: items.length,
       successfulItems: savedInsets.length,
+      failedItems: failedItems.length,
       processingTime: `${totalTime}ms`,
       summary: {
         totalQuantityAdded: savedInsets.reduce((sum, r) => sum + r.quantity, 0),
         uniqueSkus: [...new Set(savedInsets.map(r => r.skuId))].length,
         uniqueBins: [...new Set(savedInsets.map(r => r.bin))].length
       }
-    });
+    };
+
+    // 🚀 Include failed items in response if any
+    if (failedItems.length > 0) {
+      response.failedEntries = failedItems;
+      response.errors = errors;
+    }
+
+    // Use 207 Multi-Status if there were partial failures
+    const statusCode = failedItems.length > 0 ? 207 : 201;
+    res.status(statusCode).json(response);
 
   } catch (error) {
     await session.abortTransaction();
@@ -108,7 +157,7 @@ const createBatchInset = async (req, res) => {
   }
 };
 
-// Optimized single inset (reduced logging for production)
+// Optimized single inset with bin validation
 const createInset = async (req, res) => {
   try {
     const { skuId, bin, quantity, user } = req.body;
@@ -130,9 +179,20 @@ const createInset = async (req, res) => {
       });
     }
 
+    const normalizedBin = bin.trim().toUpperCase();
+
+    // 🚀 Check if bin exists - DO NOT CREATE
+    const binExists = await Bin.findOne({ name: normalizedBin, isActive: true });
+    if (!binExists) {
+      return res.status(400).json({
+        message: `Bin "${normalizedBin}" does not exist. Please create the bin first or select an existing bin.`,
+        field: 'bin'
+      });
+    }
+
     const insetData = {
       skuId: skuId.trim().toUpperCase(),
-      bin: bin.trim().toUpperCase(),
+      bin: normalizedBin,
       quantity: Number(quantity),
       user: {
         id: user?.id || req.userId,
@@ -222,7 +282,7 @@ const importInboundExcel = async (req, res) => {
       statusCode = 400;
       success = false;
     } else if (results.errorCount > 0) {
-      statusCode = 207;
+      statusCode = 207; // Multi-Status for partial success
     }
 
     res.status(statusCode).json({
@@ -236,8 +296,8 @@ const importInboundExcel = async (req, res) => {
       errorCount: results.errorCount,
       warnings: results.warnings,
       errors: results.errors,
+      failedEntries: results.failedEntries, // 🚀 NEW: Return failed entries
       stats: results.stats,
-      createdBins: results.createdBins,
       summary: results.summary
     });
 
@@ -252,8 +312,8 @@ const importInboundExcel = async (req, res) => {
       errorCount: 1,
       warnings: [],
       errors: [{ row: 0, message: error.message, type: 'SYSTEM_ERROR' }],
-      stats: { successRate: '0%', createdBinsCount: 0, warningCount: 0 },
-      createdBins: [],
+      failedEntries: [],
+      stats: { successRate: '0%', warningCount: 0, failedEntriesCount: 0 },
       summary: []
     });
   }
@@ -317,11 +377,22 @@ const updateInset = async (req, res) => {
       });
     }
 
+    const normalizedBin = bin.trim().toUpperCase();
+
+    // 🚀 Check if bin exists
+    const binExists = await Bin.findOne({ name: normalizedBin, isActive: true });
+    if (!binExists) {
+      return res.status(400).json({
+        message: `Bin "${normalizedBin}" does not exist.`,
+        field: 'bin'
+      });
+    }
+
     const updatedInset = await Inset.findByIdAndUpdate(
       id,
       {
         skuId: skuId.trim().toUpperCase(),
-        bin: bin.trim().toUpperCase(),
+        bin: normalizedBin,
         quantity: Number(quantity)
       },
       { new: true, runValidators: true }
@@ -424,7 +495,7 @@ const deleteInset = async (req, res) => {
 
 module.exports = {
   createInset,
-  createBatchInset, // 🚀 NEW
+  createBatchInset,
   getAllInsets,
   getInsetById,
   updateInset,

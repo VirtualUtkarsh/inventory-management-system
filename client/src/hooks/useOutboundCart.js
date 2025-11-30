@@ -84,7 +84,7 @@ export const useOutboundCart = () => {
   }, []);
 
   // ✅ Memoized summary - only recalculates when cartItems changes
-  const getCartSummary = useMemo(() => {
+  const cartSummary = useMemo(() => {
     const totalItems = cartItems.length;
     const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const uniqueSkus = new Set(cartItems.map(item => item.skuId)).size;
@@ -98,6 +98,6 @@ export const useOutboundCart = () => {
     removeFromCart,
     updateQuantity,
     clearCart,
-    cartSummary: getCartSummary // Return object directly instead of function
+    cartSummary // Return object directly instead of function
   };
 };

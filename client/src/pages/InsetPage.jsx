@@ -8,6 +8,8 @@ import { useInboundCart } from '../hooks/useInboundCart'; // 🚀 NEW
 import InboundCart from '../components/InboundCart'; // 🚀 NEW
 import ExcelImport from '../components/ExcelImport';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import MobileInboundWizard from '../components/MobileInboundWizard';
+import { Smartphone } from 'lucide-react';
 import {
   Plus, Search, Filter, Download, Printer, RefreshCw,
   ArrowDownToLine, TrendingUp, Calendar, User, MapPin,
@@ -51,6 +53,7 @@ const [bins, setBins] = useState([]);
   const [binsLoading, setBinsLoading] = useState(true);
   const [binSearchTerm, setBinSearchTerm] = useState('');
   const [showBinDropdown, setShowBinDropdown] = useState(false);
+  const [showMobileWizard, setShowMobileWizard] = useState(false);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -171,22 +174,33 @@ const fetchInsets = useCallback(async (forceRefresh = false) => {
   }
 }, [getInsets, invalidateCache, getCachedData]);
 
-  const handleImportComplete = useCallback((results) => {
-    if (results.data?.successCount > 0) {
-      toast.success(
-        `Successfully imported ${results.data.successCount} inbound records.`
-      );
-invalidateCache(['insets', 'inventory']);
-setTimeout(() => {
-  fetchInsets(true);
-  setShowImportModal(false);
-}, 1000);
-    }
-    
-    if (results.data?.errorCount > 0) {
-      toast.warning(`${results.data.errorCount} records had errors.`);
-    }
-  }, [fetchInsets, invalidateCache]);
+const handleImportComplete = useCallback((results) => {
+  // 🚀 UPDATED: Handle failed entries
+  if (results.successCount > 0) {
+    toast.success(
+      `Successfully imported ${results.successCount} inbound records.`,
+      { autoClose: 3000 }
+    );
+  }
+  
+  if (results.errorCount > 0) {
+    toast.warning(
+      `${results.errorCount} records had errors. ${results.failedEntries?.length || 0} entries failed due to invalid bins.`,
+      { autoClose: 5000 }
+    );
+  }
+
+  // Log failed entries for user reference
+  if (results.failedEntries && results.failedEntries.length > 0) {
+    console.warn('Failed import entries:', results.failedEntries);
+  }
+
+  invalidateCache(['insets', 'inventory']);
+  setTimeout(() => {
+    fetchInsets(true);
+    setShowImportModal(false);
+  }, 1000);
+}, [fetchInsets, invalidateCache]);
 
   useEffect(() => {
     fetchBins();
@@ -272,77 +286,117 @@ setTimeout(() => {
   };
 
   // 🚀 NEW: Add to cart instead of immediate submit
-  const handleAddToCart = (e) => {
-    e.preventDefault();
-    
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+const handleAddToCart = (e) => {
+  e.preventDefault();
+  
+  const validationError = validateForm();
+  if (validationError) {
+    setError(validationError);
+    return;
+  }
 
-    addToCart({
-      skuId: formData.skuId.trim().toUpperCase(),
-      bin: formData.bin,
-      quantity: Number(formData.quantity)
+  // 🚀 NEW: Check if bin exists in fetched bins list
+  const binExists = bins.some(b => b.name.toUpperCase() === formData.bin.toUpperCase());
+  if (!binExists) {
+    setError(`Bin "${formData.bin}" does not exist. Please select an existing bin from the dropdown.`);
+    return;
+  }
+
+  addToCart({
+    skuId: formData.skuId.trim().toUpperCase(),
+    bin: formData.bin,
+    quantity: Number(formData.quantity)
+  });
+
+  // Reset form but keep it open
+  setFormData({
+    skuId: '',
+    bin: '',
+    quantity: ''
+  });
+  setBinSearchTerm('');
+  setError(null);
+  
+  // 🚀 NEW: Show success feedback
+  toast.success('Item added to cart!', { autoClose: 2000 });
+};
+
+// 🚀 NEW: Process cart (batch submission)
+const handleProcessCart = async (cartData) => {
+  try {
+    setProcessingCart(true);
+
+    const response = await axiosInstance.post('/api/insets/batch', {
+      items: cartData.items,
+      notes: cartData.notes,
+      user: {
+        id: user.id,
+        name: user.name
+      }
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
     });
 
-    // Reset form but keep it open
-    setFormData({
-      skuId: '',
-      bin: '',
-      quantity: ''
-    });
-    setBinSearchTerm('');
-    setError(null);
-  };
-
-  // 🚀 NEW: Process cart (batch submission)
-  const handleProcessCart = async (cartData) => {
-    try {
-      setProcessingCart(true);
-
-      const response = await axiosInstance.post('/api/insets/batch', {
-        items: cartData.items,
-        notes: cartData.notes,
-        user: {
-          id: user.id,
-          name: user.name
-        }
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
+    // 🚀 UPDATED: Check for partial failures
+    if (response.data.failedItems > 0) {
+      toast.warning(
+        `Batch partially completed: ${response.data.successfulItems} succeeded, ${response.data.failedItems} failed. Check failed entries.`,
+        { autoClose: 5000 }
+      );
+      
+      // Log failed entries for debugging
+      if (response.data.failedEntries) {
+        console.warn('Failed entries:', response.data.failedEntries);
+      }
+    } else {
       toast.success(`Batch inbound completed! ${response.data.successfulItems} items processed.`);
-      
-      // 🚀 Optimistic update: Add new items to state without full refresh
-      const newInsets = cartData.items.map((item, index) => ({
-        _id: `temp-${Date.now()}-${index}`,
-        skuId: item.skuId,
-        bin: item.bin,
-        quantity: item.quantity,
-        user: { id: user.id, name: user.name },
-        createdAt: new Date().toISOString()
-      }));
-      
-      setInsets(prev => [...newInsets, ...prev]);
-clearCart();
-setShowCart(false);
-
-// Invalidate both caches and refresh
-invalidateCache(['insets', 'inventory']);
-setTimeout(() => fetchInsets(true), 1000);
-      
-      // Fetch in background to sync with server
-      setTimeout(fetchInsets, 1000);
-
-    } catch (error) {
-      console.error('Cart processing error:', error);
-      toast.error(error.response?.data?.message || 'Failed to process inbound batch');
-    } finally {
-      setProcessingCart(false);
     }
-  };
+    
+    // 🚀 Optimistic update: Add only successful items to state
+    const successfulItems = cartData.items.filter((item, index) => {
+      // Check if this item is NOT in the failed list
+      return !response.data.failedEntries?.some(failed => 
+        failed.sku === item.skuId.toUpperCase() && 
+        failed.bin === item.bin.toUpperCase()
+      );
+    });
+
+    const newInsets = successfulItems.map((item, index) => ({
+      _id: `temp-${Date.now()}-${index}`,
+      skuId: item.skuId,
+      bin: item.bin,
+      quantity: item.quantity,
+      user: { id: user.id, name: user.name },
+      createdAt: new Date().toISOString()
+    }));
+    
+    setInsets(prev => [...newInsets, ...prev]);
+    clearCart();
+    setShowCart(false);
+
+    // Invalidate both caches and refresh
+    invalidateCache(['insets', 'inventory']);
+    setTimeout(() => fetchInsets(true), 1000);
+
+  } catch (error) {
+    console.error('Cart processing error:', error);
+    
+    // 🚀 UPDATED: Show more detailed error with failed entries info
+    const errorMsg = error.response?.data?.message || 'Failed to process inbound batch';
+    const failedCount = error.response?.data?.failedItems || 0;
+    
+    if (failedCount > 0) {
+      toast.error(
+        `${errorMsg}. ${failedCount} items failed. Please check bin availability.`,
+        { autoClose: 7000 }
+      );
+    } else {
+      toast.error(errorMsg);
+    }
+  } finally {
+    setProcessingCart(false);
+  }
+};
 
   const resetForm = () => {
     setFormData({ skuId: '', bin: '', quantity: '' });
@@ -516,13 +570,15 @@ setTimeout(() => fetchInsets(true), 1000);
         </div>
         
         <div className="mt-4 lg:mt-0 flex flex-wrap gap-3">
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add to Cart
-          </button>
+        <button
+          onClick={() => setShowMobileWizard(true)}
+          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm font-medium rounded-lg transition-all"
+        >
+          {/* <Smartphone className="w-4 h-4 mr-2" /> */}
+                          <Plus className="w-4 h-4 mr-2" />
+          
+          Add Item
+        </button>
 
           {/* 🚀 NEW: Cart Button */}
           <button
@@ -1081,6 +1137,17 @@ setTimeout(() => fetchInsets(true), 1000);
         confirmText="Delete & Reverse Inventory"
         isLoading={deletingInset}
       />
+      {/* Mobile Barcode Wizard */}
+{showMobileWizard && (
+  <MobileInboundWizard
+    bins={bins}
+    onAddToCart={(item) => {
+      addToCart(item);
+      setShowMobileWizard(false);
+    }}
+    onClose={() => setShowMobileWizard(false)}
+  />
+)}
     </div>
   );
 };

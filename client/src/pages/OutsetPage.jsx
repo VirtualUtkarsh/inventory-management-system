@@ -9,6 +9,8 @@ import { useOutboundCart } from '../hooks/useOutboundCart';
 import ProductSelector from '../components/ProductSelector';
 import OutboundCart from '../components/OutboundCart';
 import OutboundHistoryTable from '../components/OutboundHistoryTable';
+import MobileOutboundWizard from '../components/MobileOutboundWizard';
+import { Smartphone } from 'lucide-react'; // Add this to existing lucide imports
 import {
   Plus,
   Search,
@@ -47,6 +49,7 @@ const [outsetItems, setOutsetItems] = useState([]);
   const [showProductSelector, setShowProductSelector] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showMobileWizard, setShowMobileWizard] = useState(false);
 
   // Cart functionality
 const {
@@ -182,6 +185,9 @@ const filteredOutsets = useMemo(() => {
 
 const fetchData = useCallback(async (forceRefresh = false) => {
   try {
+    // Set loading state at the start
+    setLoading(prev => ({ ...prev, inventory: true, outsets: true }));
+    
     // Invalidate if force refresh
     if (forceRefresh) {
       invalidateCache(['inventory', 'outsets']);
@@ -193,7 +199,6 @@ const fetchData = useCallback(async (forceRefresh = false) => {
       if (cachedInventory && cachedOutsets) {
         setInventory(cachedInventory.filter(item => item.quantity > 0));
         setOutsetItems(cachedOutsets);
-        setLoading(prev => ({ ...prev, inventory: false, outsets: false }));
       }
     }
 
@@ -496,14 +501,36 @@ const metrics = useMemo(() => {
         </div>
         
         <div className="mt-4 lg:mt-0 flex flex-wrap gap-3">
-          <button
+          {/* <button
             onClick={() => setShowProductSelector(true)}
             className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Products
-          </button>
+          </button> */}
+          <div className="mt-4 lg:mt-0 flex flex-wrap gap-3">
+  {/* 🚀 NEW: Barcode Wizard Button - Add this FIRST */}
+  <button
+    onClick={() => setShowMobileWizard(true)}
+    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm font-medium rounded-lg transition-all"
+  >
+    {/* <Smartphone className="w-4 h-4 mr-2" /> */}
+                <Plus className="w-4 h-4 mr-2" />
 
+    Pick Item
+  </button>
+
+        {/* Keep existing "Browse Products" button */}
+        {/* <button
+          onClick={() => setShowProductSelector(true)}
+          className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Browse Products
+        </button> */}
+
+        {/* Rest of your existing buttons... */}
+      </div>
           <button
             onClick={() => setShowCart(true)}
             className="relative inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
@@ -830,6 +857,17 @@ const metrics = useMemo(() => {
     onProcessCart={handleProcessCart}
     onClose={() => setShowCart(false)}
     loading={loading.processing}
+  />
+  
+)}
+{showMobileWizard && (
+  <MobileOutboundWizard
+    inventory={inventory}
+    onAddToCart={(product, quantity) => {
+      addToCart(product, quantity);
+      setShowMobileWizard(false);
+    }}
+    onClose={() => setShowMobileWizard(false)}
   />
 )}
     </div>
